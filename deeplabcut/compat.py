@@ -1091,6 +1091,7 @@ def create_tracking_dataset(
         )
     elif engine == Engine.PYTORCH:
         from deeplabcut.pose_estimation_pytorch.apis import create_tracking_dataset
+
         return create_tracking_dataset(
             config,
             videos,
@@ -1496,9 +1497,36 @@ def convert_detections2tracklets(
     --------
 
     """
+    from deeplabcut.utils import auxiliaryfunctions as aux
+
+    _loader = getattr(aux, "_load_config", None) or getattr(aux, "read_config", None)
+    if _loader is None:
+        raise ImportError(
+            "deeplabcut.utils.auxiliaryfunctions 中既无 _load_config 也无 read_config。"
+        )
+    base_cfg = _loader(config) or {}
+
+    if not track_method:
+        track_method = base_cfg.get("default_track_method", track_method)
+
+    cfg_infer_from_yaml = (
+        base_cfg.get("inference_cfg") or base_cfg.get("inferencecfg") or {}
+    ) or {}
+    merged_inferencecfg = dict(cfg_infer_from_yaml)
+    if inferencecfg:
+        merged_inferencecfg.update(inferencecfg)
+
+    # Optional keys in ``merged_inferencecfg`` that are honored by the trackers:
+    #   - 'velocity_gate_cms' : float   # velocity gate in cm/s
+    #   - 'px_per_cm'         : float   # pixels per centimeter
+    #   - 'fps'               : float   # video frame rate
+    #   - 'max_px_gate'       : float   # absolute pixel distance gate (px/frame)
+    # along with existing keys such as 'max_age', 'min_hits', 'iou_threshold',
+    # 'oks_threshold', 'pcutoff', 'topktoretain', ...
+
     if engine is None:
         engine = get_shuffle_engine(
-            _load_config(config),
+            base_cfg,
             trainingsetindex=trainingsetindex,
             shuffle=shuffle,
             modelprefix=modelprefix,
@@ -1516,7 +1544,7 @@ def convert_detections2tracklets(
             overwrite=overwrite,
             destfolder=destfolder,
             ignore_bodyparts=ignore_bodyparts,
-            inferencecfg=inferencecfg,
+            inferencecfg=merged_inferencecfg,
             modelprefix=modelprefix,
             greedy=greedy,
             calibrate=calibrate,
@@ -1543,7 +1571,7 @@ def convert_detections2tracklets(
             overwrite=overwrite,
             destfolder=destfolder,
             ignore_bodyparts=ignore_bodyparts,
-            inferencecfg=inferencecfg,
+            inferencecfg=merged_inferencecfg,
             modelprefix=modelprefix,
             identity_only=identity_only,
             track_method=track_method,

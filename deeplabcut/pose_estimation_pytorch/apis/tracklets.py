@@ -20,8 +20,8 @@ from scipy.optimize import linear_sum_assignment
 from scipy.special import softmax
 from tqdm import tqdm
 
-import deeplabcut.utils.auxiliaryfunctions as auxiliaryfunctions
 import deeplabcut.utils.auxfun_multianimal as auxfun_multianimal
+import deeplabcut.utils.auxiliaryfunctions as auxiliaryfunctions
 from deeplabcut.core import trackingutils
 from deeplabcut.core.engine import Engine
 from deeplabcut.core.inferenceutils import Assembly
@@ -164,7 +164,7 @@ def convert_detections2tracklets(
                 num_frames=data["metadata"]["nframes"],
                 ignore_bodyparts=ignore_bodyparts,
                 unique_bodyparts=cfg["uniquebodyparts"],
-                identity_only=identity_only
+                identity_only=identity_only,
             )
 
             with open(track_filename, "wb") as f:
@@ -185,10 +185,10 @@ def build_tracklets(
     joints: list[str],
     scorer: str,
     num_frames: int,
-    ignore_bodyparts: list[str]|None = None,
-    unique_bodyparts: list|None = None,
-    identity_only: bool = False
-) -> dict :
+    ignore_bodyparts: list[str] | None = None,
+    unique_bodyparts: list | None = None,
+    identity_only: bool = False,
+) -> dict:
 
     if track_method == "box":
         mot_tracker = trackingutils.SORTBox(
@@ -204,10 +204,18 @@ def build_tracklets(
             inference_cfg.get("oks_threshold", 0.5),
         )
     else:
+        v_gate_pxpf = trackingutils.compute_v_gate_pxpf(
+            inference_cfg.get("velocity_gate_cms"),
+            inference_cfg.get("px_per_cm"),
+            inference_cfg.get("fps"),
+        )
         mot_tracker = trackingutils.SORTEllipse(
             inference_cfg.get("max_age", 1),
             inference_cfg.get("min_hits", 1),
             inference_cfg.get("iou_threshold", 0.6),
+            sd=2,
+            max_px=inference_cfg.get("max_px_gate"),
+            v_gate_pxpf=v_gate_pxpf,
         )
 
     tracklets = {}
@@ -258,16 +266,12 @@ def build_tracklets(
                 # Optimal identity assignment based on soft voting
                 mat = np.zeros((len(animals), inference_cfg["topktoretain"]))
                 for row, animal_pose in enumerate(animals):
-                    animal_pose = animal_pose[
-                        ~np.isnan(animal_pose).any(axis=1)
-                    ]
-                    unique_ids, idx = np.unique(
-                        animal_pose[:, 3], return_inverse=True
-                    )
+                    animal_pose = animal_pose[~np.isnan(animal_pose).any(axis=1)]
+                    unique_ids, idx = np.unique(animal_pose[:, 3], return_inverse=True)
                     total_scores = np.bincount(idx, weights=animal_pose[:, 2])
                     softmax_id_scores = softmax(total_scores)
                     for pred_id, softmax_score in zip(
-                            unique_ids.astype(int), softmax_id_scores
+                        unique_ids.astype(int), softmax_id_scores
                     ):
                         mat[row, pred_id] = softmax_score
 

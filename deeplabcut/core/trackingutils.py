@@ -413,11 +413,23 @@ class SORTBase(metaclass=abc.ABCMeta):
 
 
 class SORTEllipse(SORTBase):
-    def __init__(self, max_age, min_hits, iou_threshold, sd=2):
+    def __init__(
+        self,
+        max_age,
+        min_hits,
+        iou_threshold,
+        sd=2,
+        max_px=None,
+        v_gate_pxpf=None,
+        verbose=False,
+    ):
         self.max_age = max_age
         self.min_hits = min_hits
         self.iou_threshold = iou_threshold
         self.fitter = EllipseFitter(sd)
+        self.max_px = max_px
+        self.v_gate_pxpf = v_gate_pxpf
+        self.verbose = verbose
         EllipseTracker.n_trackers = 0
         super().__init__()
 
@@ -432,14 +444,14 @@ class SORTEllipse(SORTBase):
         for ind in np.flatnonzero(empty)[::-1]:
             self.trackers.pop(ind)
 
-        ellipses = []
-        pred_ids = []
+        ellipses, pred_ids = [], []
         for i, pose in enumerate(poses):
             el = self.fitter.fit(pose)
             if el is not None:
                 ellipses.append(el)
                 if identities is not None:
                     pred_ids.append(mode(identities[i])[0][0])
+
         if not len(trackers):
             matches = np.empty((0, 2), dtype=int)
             unmatched_detections = np.arange(len(ellipses))
@@ -449,6 +461,14 @@ class SORTEllipse(SORTBase):
             cost_matrix = np.zeros((len(ellipses), len(ellipses_trackers)))
             for i, el in enumerate(ellipses):
                 for j, el_track in enumerate(ellipses_trackers):
+                    dist = math.hypot(el.x - el_track.x, el.y - el_track.y)
+                    if self.max_px is not None and dist > self.max_px:
+                        cost_matrix[i, j] = 0.0
+                        continue
+                    if self.v_gate_pxpf is not None and dist > self.v_gate_pxpf:
+                        cost_matrix[i, j] = 0.0
+                        continue
+
                     cost = el.calc_similarity_with(el_track)
                     if identities is not None:
                         match = 2 if pred_ids[i] == self.trackers[j].id_ else 1
@@ -464,13 +484,6 @@ class SORTEllipse(SORTBase):
             matches = []
             for row, col in zip(row_indices, col_indices):
                 val = cost_matrix[row, col]
-                # diff = val - cost_matrix
-                # diff[row, col] += val
-                # if (
-                #         val < self.iou_threshold
-                #         or np.any(diff[row] <= 0.2)
-                #         or np.any(diff[:, col] <= 0.2)
-                # ):
                 if val < self.iou_threshold:
                     unmatched_detections.append(row)
                     unmatched_trackers.append(col)
@@ -483,6 +496,11 @@ class SORTEllipse(SORTBase):
             unmatched_trackers = np.asarray(unmatched_trackers)
             unmatched_detections = np.asarray(unmatched_detections)
 
+        if self.verbose:
+            print(
+                f"[frame {self.n_frames}] um_det={unmatched_detections.tolist()}  um_trk={unmatched_trackers.tolist()}"
+            )
+
         animalindex = []
         for t, tracker in enumerate(self.trackers):
             if t not in unmatched_trackers:
@@ -494,6 +512,7 @@ class SORTEllipse(SORTBase):
 
         for i in unmatched_detections:
             trk = EllipseTracker(ellipses[i].parameters)
+            # Initialize tracker; update occurs on next frame prediction
             if identities is not None:
                 trk.id_ = mode(identities[i])[0][0]
             self.trackers.append(trk)
@@ -511,9 +530,7 @@ class SORTEllipse(SORTBase):
                         1, -1
                     )
                 )  # for DLC we also return the original animalid
-                # +1 as MOT benchmark requires positive >> this is removed for DLC!
             i -= 1
-            # remove dead tracklet
             if trk.time_since_update > self.max_age:
                 self.trackers.pop(i)
 
@@ -826,19 +843,63 @@ def reconstruct_all_ellipses(data, sd):
     return ellipses
 
 
+def compute_v_gate_pxpf(v_gate_cms=None, px_per_cm=None, fps=None):
+    try:
+        if (
+            v_gate_cms
+            and px_per_cm
+            and fps
+            and v_gate_cms > 0
+            and px_per_cm > 0
+            and fps > 0
+        ):
+            return float(v_gate_cms * (px_per_cm / fps))
+    except Exception:
+        pass
+    return None
+
+
 def _track_individuals(
-    individuals, min_hits=1, max_age=5, similarity_threshold=0.6, track_method="ellipse"
+    individuals,
+    min_hits=None,
+    max_age=None,
+    similarity_threshold=None,
+    track_method="ellipse",
+    inference_cfg=None,
 ):
     if track_method not in TRACK_METHODS:
         raise ValueError(f"Unknown {track_method} tracker.")
 
+    cfg = inference_cfg or {}
+
+    min_hits = min_hits if min_hits is not None else cfg.get("min_hits", 1)
+    max_age = max_age if max_age is not None else cfg.get("max_age", 5)
+    similarity_threshold = (
+        similarity_threshold
+        if similarity_threshold is not None
+        else cfg.get("iou_threshold", 0.6)
+    )
+
     if track_method == "ellipse":
-        tracker = SORTEllipse(max_age, min_hits, similarity_threshold)
+        v_gate_pxpf = compute_v_gate_pxpf(
+            cfg.get("velocity_gate_cms"), cfg.get("px_per_cm"), cfg.get("fps")
+        )
+        max_px = cfg.get("max_px_gate", None)
+        tracker = SORTEllipse(
+            max_age,
+            min_hits,
+            similarity_threshold,
+            sd=2,
+            max_px=max_px,
+            v_gate_pxpf=v_gate_pxpf,
+        )
     elif track_method == "box":
         tracker = SORTBox(max_age, min_hits, similarity_threshold)
     else:
         n_bodyparts = individuals[0][0].shape[0]
-        tracker = SORTSkeleton(n_bodyparts, max_age, min_hits, similarity_threshold)
+        tracker = SORTSkeleton(
+            n_bodyparts, max_age, min_hits, cfg.get("oks_threshold", 0.5)
+        )
 
     tracklets = defaultdict(dict)
     all_hyps = dict()
