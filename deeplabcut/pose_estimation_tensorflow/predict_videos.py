@@ -31,17 +31,15 @@ from scipy.optimize import linear_sum_assignment
 from skimage.util import img_as_ubyte
 from tqdm import tqdm
 
-from deeplabcut.core import trackingutils, inferenceutils
+from deeplabcut.core import inferenceutils, trackingutils
 from deeplabcut.pose_estimation_tensorflow.config import load_config
 from deeplabcut.pose_estimation_tensorflow.core import predict
-
-from deeplabcut.refine_training_dataset.stitch import stitch_tracklets
-from deeplabcut.utils import auxiliaryfunctions, auxfun_multianimal, auxfun_models
 from deeplabcut.pose_estimation_tensorflow.core.openvino.session import (
     GetPoseF_OV,
     is_openvino_available,
 )
-
+from deeplabcut.refine_training_dataset.stitch import stitch_tracklets
+from deeplabcut.utils import auxfun_models, auxfun_multianimal, auxiliaryfunctions
 
 ####################################################
 # Loading data, and defining model folder
@@ -785,7 +783,9 @@ def GetPoseS(cfg, dlc_cfg, sess, inputs, outputs, cap, nframes):
             else:
                 frame = img_as_ubyte(frame)
             pose = predict.getpose(frame, dlc_cfg, sess, inputs, outputs)
-            PredictedData[counter, :] = (
+            PredictedData[
+                counter, :
+            ] = (
                 pose.flatten()
             )  # NOTE: thereby cfg['all_joints_names'] should be same order as bodyparts!
         elif counter >= nframes:
@@ -828,7 +828,9 @@ def GetPoseS_GTF(cfg, dlc_cfg, sess, inputs, outputs, cap, nframes):
             )
             pose[:, [0, 1, 2]] = pose[:, [1, 0, 2]]
             # pose = predict.getpose(frame, dlc_cfg, sess, inputs, outputs)
-            PredictedData[counter, :] = (
+            PredictedData[
+                counter, :
+            ] = (
                 pose.flatten()
             )  # NOTE: thereby cfg['all_joints_names'] should be same order as bodyparts!
         elif counter >= nframes:
@@ -1459,10 +1461,18 @@ def _convert_detections_to_tracklets(
             inference_cfg.get("oks_threshold", 0.5),
         )
     else:
+        v_gate_pxpf = trackingutils.compute_v_gate_pxpf(
+            inference_cfg.get("velocity_gate_cms"),
+            inference_cfg.get("px_per_cm"),
+            inference_cfg.get("fps"),
+        )
         mot_tracker = trackingutils.SORTEllipse(
             inference_cfg.get("max_age", 1),
             inference_cfg.get("min_hits", 1),
             inference_cfg.get("iou_threshold", 0.6),
+            sd=2,
+            max_px=inference_cfg.get("max_px_gate"),
+            v_gate_pxpf=v_gate_pxpf,
         )
     tracklets = {}
 
@@ -1475,7 +1485,7 @@ def _convert_detections_to_tracklets(
         greedy=greedy,
         pcutoff=inference_cfg.get("pcutoff", 0.1),
         min_affinity=inference_cfg.get("pafthreshold", 0.05),
-        min_n_links=inference_cfg["minimalnumberofconnections"]
+        min_n_links=inference_cfg["minimalnumberofconnections"],
     )
     if calibrate:
         trainingsetfolder = auxiliaryfunctions.get_training_set_folder(cfg)
@@ -1752,10 +1762,18 @@ def convert_detections2tracklets(
                         inferencecfg.get("oks_threshold", 0.5),
                     )
                 else:
+                    v_gate_pxpf = trackingutils.compute_v_gate_pxpf(
+                        inferencecfg.get("velocity_gate_cms"),
+                        inferencecfg.get("px_per_cm"),
+                        inferencecfg.get("fps"),
+                    )
                     mot_tracker = trackingutils.SORTEllipse(
                         inferencecfg.get("max_age", 1),
                         inferencecfg.get("min_hits", 1),
                         inferencecfg.get("iou_threshold", 0.6),
+                        sd=2,
+                        max_px=inferencecfg.get("max_px_gate"),
+                        v_gate_pxpf=v_gate_pxpf,
                     )
                 tracklets = {}
                 multi_bpts = cfg["multianimalbodyparts"]
@@ -1768,7 +1786,7 @@ def convert_detections2tracklets(
                     min_affinity=inferencecfg.get("pafthreshold", 0.05),
                     window_size=window_size,
                     identity_only=identity_only,
-                    min_n_links=inferencecfg["minimalnumberofconnections"]
+                    min_n_links=inferencecfg["minimalnumberofconnections"],
                 )
                 assemblies_filename = dataname.split(".h5")[0] + "_assemblies.pickle"
                 if not os.path.exists(assemblies_filename) or overwrite:
