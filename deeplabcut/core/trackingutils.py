@@ -846,14 +846,12 @@ def reconstruct_all_ellipses(data, sd):
 def compute_v_gate_pxpf(v_gate_cms=None, px_per_cm=None, fps=None):
     try:
         if (
-            v_gate_cms
-            and px_per_cm
-            and fps
-            and v_gate_cms > 0
-            and px_per_cm > 0
-            and fps > 0
+            v_gate_cms is not None
+            and px_per_cm is not None
+            and fps is not None
         ):
-            return float(v_gate_cms * (px_per_cm / fps))
+            if v_gate_cms > 0 and px_per_cm > 0 and fps > 0:
+                return float(v_gate_cms * (px_per_cm / fps))
     except Exception:
         pass
     return None
