@@ -13,6 +13,13 @@ import pytest
 from deeplabcut.core import trackingutils
 
 
+def test_compute_v_gate_pxpf():
+    assert trackingutils.compute_v_gate_pxpf(1, 2, 4) == 0.5
+    assert trackingutils.compute_v_gate_pxpf(None, 2, 4) is None
+    assert trackingutils.compute_v_gate_pxpf(1, -2, 4) is None
+    assert trackingutils.compute_v_gate_pxpf(1, 2, 0) is None
+
+
 @pytest.fixture()
 def ellipse():
     params = {"x": 0, "y": 0, "width": 2, "height": 4, "theta": np.pi / 2}
