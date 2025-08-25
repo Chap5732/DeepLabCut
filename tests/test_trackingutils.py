@@ -63,6 +63,39 @@ def test_sort_ellipse():
     assert all(np.array_equal(tracklets[n][0], pose) for n, pose in enumerate(poses))
 
 
+def _ellipse_pose(offset):
+    base = np.array([[-2, 0], [2, 0], [0, 1], [0, -1]], dtype=float)
+    return base + np.asarray(offset)
+
+
+def test_sort_ellipse_max_px_gate():
+    mot_tracker = trackingutils.SORTEllipse(5, 1, 0.1, max_px=5)
+    pose = _ellipse_pose((0, 0))[None, ...]
+    mot_tracker.track(pose)
+    far_pose = _ellipse_pose((10, 10))[None, ...]
+    ret = mot_tracker.track(far_pose)
+    assert ret.size == 0
+    assert len(mot_tracker.trackers) == 2
+    assert mot_tracker.trackers[0].time_since_update == 1
+    ret = mot_tracker.track(pose)
+    assert ret.shape[0] == 1
+    assert ret[0, -2] == 0
+
+
+def test_sort_ellipse_v_gate_pxpf():
+    mot_tracker = trackingutils.SORTEllipse(5, 1, 0.1, v_gate_pxpf=5)
+    pose = _ellipse_pose((0, 0))[None, ...]
+    mot_tracker.track(pose)
+    far_pose = _ellipse_pose((10, 10))[None, ...]
+    ret = mot_tracker.track(far_pose)
+    assert ret.size == 0
+    assert len(mot_tracker.trackers) == 2
+    assert mot_tracker.trackers[0].time_since_update == 1
+    ret = mot_tracker.track(pose)
+    assert ret.shape[0] == 1
+    assert ret[0, -2] == 0
+
+
 def test_tracking_ellipse(real_assemblies, real_tracklets):
     tracklets_ref = real_tracklets.copy()
     _ = tracklets_ref.pop("header", None)
