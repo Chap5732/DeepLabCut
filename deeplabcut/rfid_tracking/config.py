@@ -55,3 +55,53 @@ DRAW_READERS = True
 DRAW_ROIS = True
 
 MAX_FRAMES = None
+
+# ================== match_rfid_to_tracklets 默认参数 ==================
+# 路径可在此修改，或通过 load_mrt_config 从 YAML 覆盖
+MRT_PICKLE_PATH = PICKLE_IN
+MRT_RFID_CSV = "/ssd01/user_acc_data/oppa/analysis/data/jc0813/rfid_data_20250813_055827.csv"
+MRT_CENTERS_TXT = CENTERS_TXT
+MRT_TS_CSV = "/ssd01/user_acc_data/oppa/analysis/data/jc0813/record_20250813_053913_timestamps.csv"
+MRT_OUT_DIR = None  # None -> 与 pickle 同目录创建 rfid_match_outputs/
+
+MRT_N_ROWS = 12
+MRT_N_COLS = 12
+MRT_ID_BASE = 0
+MRT_Y_TOP_TO_BOTTOM = True
+
+MRT_PCUTOFF = 0.35
+MRT_RFID_FRAME_RANGE = 10
+MRT_COIL_DIAMETER_PX = 170.0
+MRT_HIT_MARGIN = 1.00
+MRT_HIT_RADIUS_PX = (MRT_COIL_DIAMETER_PX / 2.0) * MRT_HIT_MARGIN
+
+MRT_UNIQUE_NEIGHBOR_ONLY = True
+MRT_AMBIG_MARGIN_PX = 75.0
+
+MRT_LOW_FREQ_TAG_MIN_COUNT = 2
+MRT_MIN_VALID_FRAMES_PER_TK = 1
+
+MRT_TAG_CONFIDENCE_THRESHOLD = 0.70
+MRT_TAG_MIN_READS = 20
+MRT_TAG_DOMINANT_RATIO = 3.0
+MRT_LOW_READS_HIGH_PURITY_ASSIGN = True
+MRT_LOW_READS_PURITY_THRESHOLD = 0.90
+
+MRT_USE_FRAME_STABILITY_CHECK = False
+MRT_BURST_GAP_FRAMES = 150
+MRT_MIN_BURSTS_IF_LOWHITS = 2
+MRT_LOWHITS_THRESHOLD = 200
+
+
+def load_mrt_config(yaml_path: str) -> None:
+    """Override MRT_* defaults from a YAML file."""
+    import yaml
+
+    with open(yaml_path, "r", encoding="utf-8") as f:
+        data = yaml.safe_load(f) or {}
+
+    for key, value in data.items():
+        key = key if key.startswith("MRT_") else f"MRT_{key}".upper()
+        if key in globals():
+            globals()[key] = value
+

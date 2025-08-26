@@ -86,7 +86,23 @@ python convert_detection2tracklets.py --config-path <项目config.yaml> --video-
 - `--destfolder`：输出目录（默认跟随视频路径）
 - `--videotype`：目录模式下的视频后缀
 
-### 1. 轨迹重建
+### 1. RFID 与 tracklet 匹配
+```bash
+# 在 config.py 中设置 MRT_* 路径或提供 YAML 覆盖
+python match_rfid_to_tracklets.py                # 使用 config.py 中的默认值
+python match_rfid_to_tracklets.py --config my_mrt.yaml  # 读取外部 YAML
+```
+
+示例 YAML (`my_mrt.yaml`):
+```yaml
+MRT_PICKLE_PATH: /path/to/tracklets.pickle
+MRT_RFID_CSV: /path/to/rfid.csv
+MRT_CENTERS_TXT: /path/to/readers_centers.txt
+MRT_TS_CSV: /path/to/timestamps.csv
+MRT_OUT_DIR: ./rfid_match_outputs
+```
+
+### 2. 轨迹重建
 ```bash
 # 根据实际情况修改 config.py 中的路径与门控参数
 python reconstruct_from_pickle.py
@@ -96,7 +112,7 @@ python reconstruct_from_pickle.py
 - 更新后的pickle文件（包含chain_tag和chain_id）
 - `chain_segments.csv`：链段详细信息
 
-### 2. 视频生成
+### 3. 视频生成
 ```bash
 # 根据实际情况修改 config.py 中的路径与可视化参数
 python make_video.py
@@ -129,6 +145,13 @@ python make_video.py
 - `CHAIN_TRAIL_LEN`：身份链轨迹长度
 - `TAG_HOLD_FRAMES`：RFID 标签显示持续帧数
 - `MAX_FRAMES`：最大输出帧数（`None` 表示全部）
+
+### match_rfid_to_tracklets 参数
+- `MRT_PICKLE_PATH` / `MRT_RFID_CSV` / `MRT_CENTERS_TXT` / `MRT_TS_CSV` / `MRT_OUT_DIR`
+- `MRT_HIT_RADIUS_PX`、`MRT_AMBIG_MARGIN_PX`、`MRT_TAG_CONFIDENCE_THRESHOLD` 等匹配门槛
+
+这些参数可直接在 `config.py` 中修改，或写入 YAML 后通过
+`python match_rfid_to_tracklets.py --config my_mrt.yaml` 加载。
 
 ## 数据格式
 
