@@ -20,6 +20,12 @@ from collections import defaultdict
 
 import numpy as np
 import pandas as pd
+from utils import (
+    load_tracklets_pickle,
+    frame_idx_from_key,
+    find_mouse_center_index,
+    body_center_from_arr,
+)
 
 # ==========================
 # ====== 用户配置区 =========
@@ -204,34 +210,6 @@ def time_to_nearest_frame(t: float, frames: np.ndarray, times: np.ndarray) -> in
     k = int(np.searchsorted(times, t, side="left"))
     return int(frames[k-1] if abs(t - times[k-1]) <= abs(t - times[k]) else frames[k])
 
-def load_tracklets_pickle(pkl_path: str) -> dict:
-    with open(pkl_path, "rb") as f:
-        dd = pickle.load(f)
-    if not isinstance(dd, dict) or "header" not in dd:
-        raise ValueError("pickle 结构异常：未找到 'header'")
-    return dd
-
-def frame_idx_from_key(k) -> int:
-    if isinstance(k, (int, np.integer)):
-        return int(k)
-    s = str(k)
-    m = re.findall(r"\d+", s)
-    if not m:
-        raise ValueError(f"无法从帧键 '{k}' 提取数字")
-    return int(m[0])
-
-def find_mouse_center_index(header) -> int | None:
-    try:
-        bps = header.get_level_values("bodyparts").unique().to_list()
-    except Exception:
-        return None
-    norm = lambda s: re.sub(r"[\s_]+", "", str(s).lower())
-    targets = {"mouse_center", "center", "bodycenter", "mousecentre"}
-    for i, bp in enumerate(bps):
-        if norm(bp) in targets:
-            return i
-    return None
-
 def mean_confidence(arr: np.ndarray) -> float:
     try:
         p = arr[:, 2]
@@ -239,25 +217,6 @@ def mean_confidence(arr: np.ndarray) -> float:
         return m if np.isfinite(m) else 0.0
     except Exception:
         return 0.0
-
-def body_center_from_arr(arr: np.ndarray, mc_idx: int | None, pcutoff: float) -> tuple[float,float] | None:
-    if arr is None or not isinstance(arr, np.ndarray) or arr.ndim != 2 or arr.shape[1] < 3:
-        return None
-    if mc_idx is not None and mc_idx < arr.shape[0]:
-        x, y, lk = arr[mc_idx, 0], arr[mc_idx, 1], arr[mc_idx, 2]
-        if np.isfinite(x) and np.isfinite(y) and float(lk) >= pcutoff:
-            return float(x), float(y)
-    xy = arr[:, :2]
-    lk = arr[:, 2]
-    mask = np.isfinite(xy).all(axis=1) & np.isfinite(lk) & (lk >= pcutoff)
-    if not np.any(mask):
-        return None
-    w = np.clip(lk[mask], 0.0, None) + 1e-12
-    cx = float(np.nansum(xy[mask,0] * w) / np.nansum(w))
-    cy = float(np.nansum(xy[mask,1] * w) / np.nansum(w))
-    if np.isfinite(cx) and np.isfinite(cy):
-        return cx, cy
-    return None
 
 # ---- 逐帧稳健性 & 分配 ----
 
