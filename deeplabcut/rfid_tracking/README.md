@@ -6,11 +6,13 @@
 
 ```
 project/
-├── utils.py                      # 核心工具函数库
-├── reconstruct_from_pickle.py    # 轨迹重建脚本
-├── make_video.py                 # 视频可视化脚本
-├── roi_definitions.json          # ROI区域定义文件
-└── README.md                     # 项目说明
+├── utils.py                              # 核心工具函数库
+├── convert_detection2tracklets.py        # 检测结果转 tracklets
+├── convert_detection2tracklets_config.yaml  # 默认参数
+├── reconstruct_from_pickle.py            # 轨迹重建脚本
+├── make_video.py                         # 视频可视化脚本
+├── roi_definitions.json                  # ROI区域定义文件
+└── README.md                             # 项目说明
 ```
 
 ## 功能概述
@@ -47,6 +49,18 @@ project/
 - **几何计算**：ROI命中测试、距离计算
 
 ## 使用方法
+
+### 0. 检测结果转 tracklets
+```bash
+# 如需修改默认参数，先编辑 convert_detection2tracklets_config.yaml
+python convert_detection2tracklets.py --config-path <项目config.yaml> --video-input <视频或目录>
+```
+
+常用选项：
+- `--track-method`：`ellipse` / `skeleton` / `box`
+- `--shuffle`：训练 shuffle 编号
+- `--destfolder`：输出目录（默认跟随视频路径）
+- `--videotype`：目录模式下的视频后缀
 
 ### 1. 轨迹重建
 ```bash

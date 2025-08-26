@@ -1,0 +1,6 @@
+config_path: ""
+track_method: "ellipse"
+shuffle: 1
+destfolder: ""
+video_input: ""
+videotype: "mp4"
