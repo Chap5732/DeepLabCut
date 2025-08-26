@@ -21,40 +21,37 @@ from .visualization import (
     load_rois, draw_rois
 )
 
+try:  # 允许作为脚本或模块运行
+    from . import config
+except ImportError:  # pragma: no cover
+    import config
+
 # ================== 配置参数 ==================
-# 文件路径
-VIDEO_PATH = "/ssd01/user_acc_data/oppa/deeplabcut/videos/test/demo.mp4"
-PICKLE_PATH = "/ssd01/user_acc_data/oppa/deeplabcut/projects/MiceTrackerFor20-Oppa-2024-12-08/analyze_videos/shuffle3/demo1/velocity_gating/CAP15/demoDLC_HrnetW32_MiceTrackerFor20Dec8shuffle3_detector_best-250_snapshot_best-190_el.pickle"
-# 输出到指定文件夹
-OUTPUT_VIDEO = "/ssd01/user_acc_data/oppa/deeplabcut/projects/MiceTrackerFor20-Oppa-2024-12-08/analyze_videos/shuffle3/demo1/velocity_gating/CAP15/demo_tracked.mp4"
+VIDEO_PATH = config.VIDEO_PATH
+PICKLE_PATH = config.PICKLE_PATH
+OUTPUT_VIDEO = config.OUTPUT_VIDEO
 
-# 读卡器可视化
-DRAW_READERS = True
-CENTERS_TXT = "/ssd01/user_acc_data/oppa/analysis/data/jc0813/readers_centers.txt"
+DRAW_READERS = config.DRAW_READERS
+CENTERS_TXT = config.CENTERS_TXT
 
-# ROI可视化
-DRAW_ROIS = True
-ROI_FILE = "/ssd01/user_acc_data/oppa/analysis/rfid_dlc_tracking/version2_tracking/roi_definitions.json"
+DRAW_ROIS = config.DRAW_ROIS
+ROI_FILE = config.ROI_FILE
 
-# 轨迹参数
-PCUTOFF = 0.35                # 置信度阈值
-TRAIL_LEN = 15                # tracklet轨迹长度
-TAG_HOLD_FRAMES = 3           # RFID标签显示持续帧数
+PCUTOFF = config.PCUTOFF
+TRAIL_LEN = config.TRAIL_LEN
+TAG_HOLD_FRAMES = config.TAG_HOLD_FRAMES
 
-# 身份链可视化
-SHOW_CHAIN = True             # 是否显示重建的身份链
-CHAIN_FALLBACK_ID = True      # 是否使用chain_id作为回退
-CHAIN_TRAIL_LEN = 40          # 身份链轨迹长度
-CHAIN_LINE_THICK = 3          # 身份链线条粗细
-CHAIN_POINT_R = 5             # 身份链端点半径
+SHOW_CHAIN = config.SHOW_CHAIN
+CHAIN_FALLBACK_ID = config.CHAIN_FALLBACK_ID
+CHAIN_TRAIL_LEN = config.CHAIN_TRAIL_LEN
+CHAIN_LINE_THICK = config.CHAIN_LINE_THICK
+CHAIN_POINT_R = config.CHAIN_POINT_R
 
-# 图例设置
-DRAW_LEGEND = True            # 是否绘制图例
-LEGEND_COLS = 2               # 图例列数
-LEGEND_POS = (20, 40)         # 图例位置
+DRAW_LEGEND = config.DRAW_LEGEND
+LEGEND_COLS = config.LEGEND_COLS
+LEGEND_POS = config.LEGEND_POS
 
-# 输出限制
-MAX_FRAMES = None             # 最大输出帧数（None=全部）
+MAX_FRAMES = config.MAX_FRAMES
 
 # ================== 小工具 ==================
 def draw_label_with_bg(img, text, org, font_scale=0.6, thickness=2, fg=(255,255,255), bg=(0,0,0), alpha=0.4, padding=4):

@@ -9,6 +9,7 @@ project/
 ├── utils.py                              # 核心工具函数库
 ├── convert_detection2tracklets.py        # 检测结果转 tracklets
 ├── convert_detection2tracklets_config.yaml  # 默认参数
+├── config.py                             # 默认路径与门控参数
 ├── reconstruct_from_pickle.py            # 轨迹重建脚本
 ├── make_video.py                         # 视频可视化脚本
 ├── roi_definitions.json                  # ROI区域定义文件
@@ -64,7 +65,7 @@ python convert_detection2tracklets.py --config-path <项目config.yaml> --video-
 
 ### 1. 轨迹重建
 ```bash
-# 修改 reconstruct_from_pickle.py 中的路径配置
+# 根据实际情况修改 config.py 中的路径与门控参数
 python reconstruct_from_pickle.py
 ```
 
@@ -74,7 +75,7 @@ python reconstruct_from_pickle.py
 
 ### 2. 视频生成
 ```bash
-# 修改 make_video.py 中的路径配置
+# 根据实际情况修改 config.py 中的路径与可视化参数
 python make_video.py
 ```
 
@@ -83,17 +84,28 @@ python make_video.py
 
 ## 配置参数
 
-### 重建参数
-- `PCUTOFF = 0.35`：置信度阈值
-- `HEAD_TAIL_SAMPLE = 5`：头尾平均中心采样帧数
-- `MAX_GAP_FRAMES = 60`：最大时间间隔
-- `ANCHOR_MIN_HITS = 1`：锚点最少RFID命中数
+`config.py` 集中定义了默认路径与门控参数，包含以下常见设置：
+
+### 路径相关
+- `PICKLE_IN` / `PICKLE_OUT`：输入和输出的 tracklet pickle 文件
+- `VIDEO_PATH` / `OUTPUT_VIDEO`：原始视频与生成视频路径
+- `CENTERS_TXT`：读卡器中心文件
+- `ROI_FILE`：ROI 区域定义文件
+
+### 门控与重建参数
+- `FPS`：相机帧率
+- `PX_PER_CM`：像素与厘米换算
+- `V_GATE_CMS`：速度门限
+- `PCUTOFF`：置信度阈值
+- `HEAD_TAIL_SAMPLE`：头尾平均中心采样帧数
+- `MAX_GAP_FRAMES`：最大时间间隔
+- `ANCHOR_MIN_HITS`：锚点最少 RFID 命中数
 
 ### 可视化参数
-- `TRAIL_LEN = 15`：tracklet轨迹长度
-- `CHAIN_TRAIL_LEN = 40`：身份链轨迹长度
-- `TAG_HOLD_FRAMES = 3`：RFID标签显示持续帧数
-- `MAX_FRAMES = None`：最大输出帧数（None=全部）
+- `TRAIL_LEN`：tracklet 轨迹长度
+- `CHAIN_TRAIL_LEN`：身份链轨迹长度
+- `TAG_HOLD_FRAMES`：RFID 标签显示持续帧数
+- `MAX_FRAMES`：最大输出帧数（`None` 表示全部）
 
 ## 数据格式
 
@@ -120,9 +132,9 @@ python make_video.py
 ## 重构改进
 
 相比原版本的主要改进：
-1. **简化结构**：删除了config.py，配置直接硬编码在各脚本中
-2. **统一工具函数**：所有共用函数集中在utils.py中
-3. **删除冗余**：移除了不必要的复杂导入逻辑和`__init__.py`
+1. **集中配置**：新增 `config.py`，所有路径与门控参数统一管理
+2. **统一工具函数**：所有共用函数集中在 `utils.py` 中
+3. **删除冗余**：移除了不必要的复杂导入逻辑和 `__init__.py`
 4. **清晰职责**：每个脚本专注单一功能
 5. **改进文档**：添加详细的函数和参数说明
 
@@ -136,6 +148,6 @@ python make_video.py
 
 ## 注意事项
 
-- 使用前需要根据实际数据路径修改各脚本中的路径配置
-- 确保输入的pickle文件包含正确的DLC tracklet数据结构
-- ROI文件格式目前只支持polygon类型的JSON格式
+- 使用前需要根据实际数据路径修改 `config.py`
+- 确保输入的 pickle 文件包含正确的 DLC tracklet 数据结构
+- ROI 文件格式目前只支持 polygon 类型的 JSON 格式
