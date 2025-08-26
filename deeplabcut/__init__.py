@@ -60,7 +60,9 @@ from deeplabcut.generate_training_dataset import (
 )
 
 from deeplabcut.modelzoo.video_inference import video_inference_superanimal
-from deeplabcut.pose_estimation_pytorch.modelzoo.superanimal_humanbody_video_inference import analyze_videos_superanimal_humanbody
+from deeplabcut.pose_estimation_pytorch.modelzoo.superanimal_humanbody_video_inference import (
+    analyze_videos_superanimal_humanbody,
+)
 
 from deeplabcut.utils import (
     create_labeled_video,
@@ -127,3 +129,10 @@ from deeplabcut.refine_training_dataset import (
     find_outliers_in_raw_data,
 )
 from deeplabcut.post_processing import filterpredictions, analyzeskeleton
+
+from deeplabcut.rfid_tracking import (
+    match_rfid_to_tracklets,
+    reconstruct_from_pickle,
+    make_video,
+    run_pipeline as run_rfid_pipeline,
+)
