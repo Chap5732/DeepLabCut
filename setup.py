@@ -103,7 +103,8 @@ setuptools.setup(
         "wandb": ["wandb"],
     },
     scripts=["deeplabcut/pose_estimation_tensorflow/models/pretrained/download.sh"],
-    packages=setuptools.find_packages(),
+    packages=setuptools.find_packages() + setuptools.find_packages(where="tools"),
+    package_dir={"rfid_pipeline": "tools/rfid_pipeline"},
     data_files=[
         (
             "deeplabcut",
@@ -136,8 +137,15 @@ setuptools.setup(
         "License :: OSI Approved :: GNU Lesser General Public License v3 (LGPLv3)",
         "Operating System :: OS Independent",
     ],
-    entry_points="""[console_scripts]
-            dlc=deeplabcut.__main__:main""",
+    entry_points={
+        "console_scripts": ["dlc=deeplabcut.__main__:main"],
+        "rfid_pipeline": [
+            "convert_detection2tracklets=rfid_pipeline.convert_detection2tracklets:main",
+            "match_rfid_to_tracklets=rfid_pipeline.match_rfid_to_tracklets:main",
+            "make_video=rfid_pipeline.make_video:main",
+            "reconstruct_from_pickle=rfid_pipeline.reconstruct_from_pickle:main",
+        ],
+    },
 )
 
 # https://www.python.org/dev/peps/pep-0440/#compatible-release
