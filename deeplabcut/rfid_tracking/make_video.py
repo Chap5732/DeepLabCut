@@ -168,8 +168,9 @@ def draw_tracklets_layer(frame, frame_idx, pts_in_frame, tk_rfid_events, tk_trai
 
     # 更新轨迹
     for tk, (x, y) in pts_in_frame:
+        xi, yi = int(round(x)), int(round(y))
         tk_trail.setdefault(tk, deque(maxlen=TRAIL_LEN))
-        tk_trail[tk].append((int(round(x)), int(round(y))))
+        tk_trail[tk].append((frame_idx, xi, yi))
 
     # 绘制每个tracklet
     for tk, (x, y) in pts_in_frame:
@@ -179,7 +180,11 @@ def draw_tracklets_layer(frame, frame_idx, pts_in_frame, tk_rfid_events, tk_trai
         # 轨迹线
         trail = list(tk_trail[tk])
         for i in range(1, len(trail)):
-            cv2.line(canvas, trail[i-1], trail[i], color, 2, cv2.LINE_AA)
+            f0, x0, y0 = trail[i-1]
+            f1, x1, y1 = trail[i]
+            if f1 - f0 > 1:
+                continue
+            cv2.line(canvas, (x0, y0), (x1, y1), color, 2, cv2.LINE_AA)
 
         # 当前位置点
         cv2.circle(canvas, (xi, yi), 5, color, -1, cv2.LINE_AA)
@@ -215,8 +220,9 @@ def draw_chain_layer(frame, frame_idx, frame2chain_center, chain_trail):
 
     # 更新身份链轨迹
     for ck, (x, y) in items:
+        xi, yi = int(round(x)), int(round(y))
         chain_trail.setdefault(ck, deque(maxlen=CHAIN_TRAIL_LEN))
-        chain_trail[ck].append((int(round(x)), int(round(y))))
+        chain_trail[ck].append((frame_idx, xi, yi))
 
     # 绘制每个身份链
     for ck, _ in items:
@@ -225,11 +231,15 @@ def draw_chain_layer(frame, frame_idx, frame2chain_center, chain_trail):
 
         # 轨迹线
         for i in range(1, len(trail)):
-            cv2.line(canvas, trail[i-1], trail[i], color, CHAIN_LINE_THICK, cv2.LINE_AA)
+            f0, x0, y0 = trail[i-1]
+            f1, x1, y1 = trail[i]
+            if f1 - f0 > 1:
+                continue
+            cv2.line(canvas, (x0, y0), (x1, y1), color, CHAIN_LINE_THICK, cv2.LINE_AA)
 
         # 当前位置点和标签（标签放上方）
         if trail:
-            xi, yi = trail[-1]
+            _, xi, yi = trail[-1]
             cv2.circle(canvas, (xi, yi), CHAIN_POINT_R, color, -1, cv2.LINE_AA)
             label = str(ck)
             (tw, th), base = cv2.getTextSize(label, cv2.FONT_HERSHEY_SIMPLEX, 0.6, 2)
