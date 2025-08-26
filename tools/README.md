@@ -39,3 +39,15 @@ For coverage run:
 coverage run -m pytest
 coverage report
 ```
+
+## RFID pipeline
+
+The `rfid_pipeline/` directory contains scripts for integrating RFID data with DeepLabCut tracklets. Run them sequentially:
+
+1. `convert_detection2tracklets.py`
+2. `match_rfid_to_tracklets.py`
+3. `reconstruct_from_pickle.py`
+4. `make_video.py`
+
+Shared helper functions reside in `utils.py`.
+
