@@ -20,17 +20,24 @@ from collections import defaultdict
 
 import numpy as np
 import pandas as pd
+import argparse
 
 # ==========================
 # ====== 用户配置区 =========
 # ==========================
 
 # ---- 路径 ----
-PICKLE_PATH = "/ssd01/user_acc_data/oppa/deeplabcut/projects/MiceTrackerFor20-Oppa-2024-12-08/analyze_videos/shuffle3/demo1/velocity_gating/demoDLC_HrnetW32_MiceTrackerFor20Dec8shuffle3_detector_best-250_snapshot_best-190_el.pickle"
-RFID_CSV    = "/ssd01/user_acc_data/oppa/analysis/data/jc0813/rfid_data_20250813_055827.csv"
-CENTERS_TXT = "/ssd01/user_acc_data/oppa/analysis/data/jc0813/readers_centers.txt"
-TS_CSV      = "/ssd01/user_acc_data/oppa/analysis/data/jc0813/record_20250813_053913_timestamps.csv"
-OUT_DIR     = None  # None -> 与 pickle 同目录创建 rfid_match_outputs/
+DEFAULT_PICKLE_PATH = "/ssd01/user_acc_data/oppa/deeplabcut/projects/MiceTrackerFor20-Oppa-2024-12-08/analyze_videos/shuffle3/demo1/velocity_gating/demoDLC_HrnetW32_MiceTrackerFor20Dec8shuffle3_detector_best-250_snapshot_best-190_el.pickle"
+DEFAULT_RFID_CSV    = "/ssd01/user_acc_data/oppa/analysis/data/jc0813/rfid_data_20250813_055827.csv"
+DEFAULT_CENTERS_TXT = "/ssd01/user_acc_data/oppa/analysis/data/jc0813/readers_centers.txt"
+DEFAULT_TS_CSV      = "/ssd01/user_acc_data/oppa/analysis/data/jc0813/record_20250813_053913_timestamps.csv"
+DEFAULT_OUT_DIR     = None  # None -> 与 pickle 同目录创建 rfid_match_outputs/
+
+PICKLE_PATH = DEFAULT_PICKLE_PATH
+RFID_CSV = DEFAULT_RFID_CSV
+CENTERS_TXT = DEFAULT_CENTERS_TXT
+TS_CSV = DEFAULT_TS_CSV
+OUT_DIR = DEFAULT_OUT_DIR
 
 # ---- 阵列/网格配置（很关键）----
 N_ROWS  = 12           # 行数
@@ -68,6 +75,16 @@ LOWHITS_THRESHOLD         = 200
 # ==========================
 # ====== 工具函数 ===========
 # ==========================
+
+
+def parse_args():
+    parser = argparse.ArgumentParser(description="Match RFID events to tracklets")
+    parser.add_argument("--pickle-path", default=DEFAULT_PICKLE_PATH)
+    parser.add_argument("--rfid-csv", default=DEFAULT_RFID_CSV)
+    parser.add_argument("--centers-txt", default=DEFAULT_CENTERS_TXT)
+    parser.add_argument("--ts-csv", default=DEFAULT_TS_CSV)
+    parser.add_argument("--out-dir", default=DEFAULT_OUT_DIR)
+    return parser.parse_args()
 
 def ensure_out_dir(pickle_path: str) -> Path:
     out = Path(OUT_DIR) if OUT_DIR else (Path(pickle_path).parent / "rfid_match_outputs")
@@ -365,6 +382,14 @@ def assign_tag_for_one_tracklet(
 # ==========================
 
 def main():
+    args = parse_args()
+    global PICKLE_PATH, RFID_CSV, CENTERS_TXT, TS_CSV, OUT_DIR
+    PICKLE_PATH = args.pickle_path
+    RFID_CSV = args.rfid_csv
+    CENTERS_TXT = args.centers_txt
+    TS_CSV = args.ts_csv
+    OUT_DIR = args.out_dir
+
     out_dir = ensure_out_dir(PICKLE_PATH)
 
     # 1) 加载并按坐标重排为行优先网格

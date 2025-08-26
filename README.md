@@ -255,6 +255,15 @@ importing a project into the new data format for DLC 2.0
 - July 2018: Ed Yong covered DeepLabCut and interviewed several users for the [Atlantic](https://www.theatlantic.com/science/archive/2018/07/deeplabcut-tracking-animal-movements/564338).
 - April 2018: first DeepLabCut preprint on [arXiv.org](https://arxiv.org/abs/1804.03142)
 
+## Command-line examples
+
+```bash
+python deeplabcut/newfolder/convert_detection2tracklets.py --config path/to/config.yaml --video-input path/to/video.mp4
+python deeplabcut/newfolder/match_rfid_to_tracklets.py --pickle-path tracklets.pickle --rfid-csv rfid.csv --centers-txt readers_centers.txt --ts-csv timestamps.csv
+python reconstruct_from_pickle.py --pickle-in tracklets.pickle --out-subdir CAP15
+python deeplabcut/newfolder/make_video.py --video-path video.mp4 --pickle-path tracklets.pickle --output-video output.mp4 --centers-txt readers_centers.txt --roi-file roi.json
+```
+
   ## Funding
 
   We are grateful for the follow support over the years! This software project was supported in part by the Essential Open Source Software for Science (EOSS) program at Chan Zuckerberg Initiative (cycles 1, 3, 3-DEI, 4), and jointly with the Kavli Foundation for EOSS Cycle 6!  We also thank the Rowland Institute at Harvard for funding from 2017-2020, and EPFL from 2020-present.

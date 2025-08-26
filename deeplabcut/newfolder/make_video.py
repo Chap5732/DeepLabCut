@@ -13,6 +13,7 @@ from pathlib import Path
 from collections import defaultdict, deque
 import cv2
 import numpy as np
+import argparse
 from utils import (
     load_tracklets_pickle, frame_idx_from_key, find_mouse_center_index,
     body_center_from_arr, color_for_id, parse_centers,
@@ -21,19 +22,19 @@ from utils import (
 )
 
 # ================== 配置参数 ==================
-# 文件路径
-VIDEO_PATH = "/ssd01/user_acc_data/oppa/deeplabcut/videos/test/demo.mp4"
-PICKLE_PATH = "/ssd01/user_acc_data/oppa/deeplabcut/projects/MiceTrackerFor20-Oppa-2024-12-08/analyze_videos/shuffle3/demo1/velocity_gating/CAP15/demoDLC_HrnetW32_MiceTrackerFor20Dec8shuffle3_detector_best-250_snapshot_best-190_el.pickle"
+# 文件路径默认值
+DEFAULT_VIDEO_PATH = "/ssd01/user_acc_data/oppa/deeplabcut/videos/test/demo.mp4"
+DEFAULT_PICKLE_PATH = "/ssd01/user_acc_data/oppa/deeplabcut/projects/MiceTrackerFor20-Oppa-2024-12-08/analyze_videos/shuffle3/demo1/velocity_gating/CAP15/demoDLC_HrnetW32_MiceTrackerFor20Dec8shuffle3_detector_best-250_snapshot_best-190_el.pickle"
 # 输出到指定文件夹
-OUTPUT_VIDEO = "/ssd01/user_acc_data/oppa/deeplabcut/projects/MiceTrackerFor20-Oppa-2024-12-08/analyze_videos/shuffle3/demo1/velocity_gating/CAP15/demo_tracked.mp4"
+DEFAULT_OUTPUT_VIDEO = "/ssd01/user_acc_data/oppa/deeplabcut/projects/MiceTrackerFor20-Oppa-2024-12-08/analyze_videos/shuffle3/demo1/velocity_gating/CAP15/demo_tracked.mp4"
 
 # 读卡器可视化
 DRAW_READERS = True
-CENTERS_TXT = "/ssd01/user_acc_data/oppa/analysis/data/jc0813/readers_centers.txt"
+DEFAULT_CENTERS_TXT = "/ssd01/user_acc_data/oppa/analysis/data/jc0813/readers_centers.txt"
 
 # ROI可视化
 DRAW_ROIS = True
-ROI_FILE = "/ssd01/user_acc_data/oppa/analysis/rfid_dlc_tracking/version2_tracking/roi_definitions.json"
+DEFAULT_ROI_FILE = "/ssd01/user_acc_data/oppa/analysis/rfid_dlc_tracking/version2_tracking/roi_definitions.json"
 
 # 轨迹参数
 PCUTOFF = 0.35                # 置信度阈值
@@ -54,6 +55,16 @@ LEGEND_POS = (20, 40)         # 图例位置
 
 # 输出限制
 MAX_FRAMES = None             # 最大输出帧数（None=全部）
+
+
+def parse_args():
+    parser = argparse.ArgumentParser(description="Visualize tracklets and RFID events on video")
+    parser.add_argument("--video-path", default=DEFAULT_VIDEO_PATH)
+    parser.add_argument("--pickle-path", default=DEFAULT_PICKLE_PATH)
+    parser.add_argument("--output-video", default=DEFAULT_OUTPUT_VIDEO)
+    parser.add_argument("--centers-txt", default=DEFAULT_CENTERS_TXT)
+    parser.add_argument("--roi-file", default=DEFAULT_ROI_FILE)
+    return parser.parse_args()
 
 # ================== 小工具 ==================
 def draw_label_with_bg(img, text, org, font_scale=0.6, thickness=2, fg=(255,255,255), bg=(0,0,0), alpha=0.4, padding=4):
@@ -266,15 +277,16 @@ def draw_chain_legend(frame, chain_trail, pos=(20, 40), cols=2):
 # ================== 主函数 ==================
 def main():
     """主函数"""
+    args = parse_args()
     # 检查文件是否存在
-    for pth, msg in [(VIDEO_PATH, "视频"), (PICKLE_PATH, "pickle")]:
+    for pth, msg in [(args.video_path, "视频"), (args.pickle_path, "pickle")]:
         if not Path(pth).exists():
             print(f"错误：{msg}文件不存在: {pth}")
             return
 
     # 加载数据
     print("正在加载tracklet数据...")
-    dd = load_tracklets_pickle(PICKLE_PATH)
+    dd = load_tracklets_pickle(args.pickle_path)
 
     print("构建每帧数据结构...")
     (frames_sorted, frame2tk_center, tk_rfid_events, tk_trail,
@@ -285,18 +297,18 @@ def main():
 
     # 加载读卡器位置（可选）
     reader_positions = None
-    if DRAW_READERS and Path(CENTERS_TXT).exists():
-        centers, meta = parse_centers(CENTERS_TXT)
+    if DRAW_READERS and Path(args.centers_txt).exists():
+        centers, meta = parse_centers(args.centers_txt)
         reader_positions = centers_to_reader_positions_column_major(centers, meta)
         print(f"读取到 {len(reader_positions)} 个读卡器位置")
 
     # 加载ROI（可选）
-    rois = load_rois(ROI_FILE) if (DRAW_ROIS and ROI_FILE and Path(ROI_FILE).exists()) else []
+    rois = load_rois(args.roi_file) if (DRAW_ROIS and args.roi_file and Path(args.roi_file).exists()) else []
     if rois:
         print(f"加载了 {len(rois)} 个ROI区域")
 
     # 打开视频
-    cap = cv2.VideoCapture(VIDEO_PATH)
+    cap = cv2.VideoCapture(args.video_path)
     if not cap.isOpened():
         print("错误：无法打开视频文件")
         return
@@ -309,7 +321,7 @@ def main():
 
     # 设置输出视频
     fourcc = cv2.VideoWriter_fourcc(*'mp4v')
-    out = cv2.VideoWriter(OUTPUT_VIDEO, fourcc, fps if fps > 0 else 25.0, (W, H))
+    out = cv2.VideoWriter(args.output_video, fourcc, fps if fps > 0 else 25.0, (W, H))
 
     max_frames = T if MAX_FRAMES is None else min(T, MAX_FRAMES)
     print(f"视频信息: {W}x{H}, {fps:.2f}fps, 共 {T} 帧；将输出 {max_frames} 帧")
@@ -359,7 +371,7 @@ def main():
     cap.release()
     out.release()
     cv2.destroyAllWindows()
-    print(f"[OK] 完成！输出视频: {OUTPUT_VIDEO}")
+    print(f"[OK] 完成！输出视频: {args.output_video}")
 
 if __name__ == "__main__":
     main()
