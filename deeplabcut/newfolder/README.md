@@ -88,7 +88,7 @@ python make_video.py
 {
   "Entrance1": [
     [35, 444],
-    [162, 444], 
+    [162, 444],
     [162, 634],
     [35, 634]
   ]
@@ -115,7 +115,7 @@ python make_video.py
 ## 依赖库
 
 - numpy
-- pandas  
+- pandas
 - opencv-python
 - pathlib (标准库)
 - json (标准库)
