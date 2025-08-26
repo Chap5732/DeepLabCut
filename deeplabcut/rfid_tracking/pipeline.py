@@ -2,10 +2,13 @@ from __future__ import annotations
 
 from pathlib import Path
 from typing import Optional
+import logging
 
 from .make_video import main as make_video
 from .match_rfid_to_tracklets import main as match_rfid_to_tracklets
 from .reconstruct_from_pickle import main as reconstruct_from_pickle
+
+logger = logging.getLogger(__name__)
 
 
 def run_pipeline(
@@ -80,6 +83,12 @@ def run_pipeline(
     videotype = video_path.suffix.lstrip(".")
 
     # 1) run inference to create assemblies without auto tracking
+    logger.info(
+        "Starting video analysis: %s (shuffle=%s, trainingsetindex=%s)",
+        video_path,
+        shuffle,
+        trainingsetindex,
+    )
     analyze_videos(
         str(config_path),
         [str(video_path)],
@@ -89,6 +98,7 @@ def run_pipeline(
         destfolder=str(dest),
         auto_track=False,
     )
+    logger.info("Finished video analysis: %s", video_path)
 
     # 2) convert detections to tracklets
     valid_methods = {"ellipse", "skeleton", "box"}
@@ -97,7 +107,13 @@ def run_pipeline(
             f"Unsupported track_method '{track_method}'. Supported methods are: "
             f"{', '.join(sorted(valid_methods))}."
         )
-
+    logger.info(
+        "Converting detections to tracklets for %s using %s method (shuffle=%s, trainingsetindex=%s)",
+        video_path,
+        track_method,
+        shuffle,
+        trainingsetindex,
+    )
     convert_detections2tracklets(
         config=str(config_path),
         videos=[str(video_path)],
@@ -107,6 +123,7 @@ def run_pipeline(
         track_method=track_method,
         destfolder=str(dest),
     )
+    logger.info("Finished converting detections to tracklets for %s", video_path)
 
     # Locate the generated tracklet pickle
     cfg = aux.read_config(config_path)
@@ -116,6 +133,9 @@ def run_pipeline(
     track_pickle = dest / f"{video_path.stem}{dlc_scorer}_{method_suffix}.pickle"
 
     # 3) match RFID events to tracklets
+    logger.info(
+        "Matching RFID events from %s to tracklets: %s", rfid_csv, track_pickle
+    )
     match_rfid_to_tracklets(
         pickle_path=str(track_pickle),
         rfid_csv=str(rfid_csv),
@@ -123,13 +143,16 @@ def run_pipeline(
         ts_csv=str(ts_csv),
         out_dir=None,
     )
+    logger.info("Finished matching RFID events for %s", track_pickle)
 
     # 4) reconstruct identity chains
+    logger.info("Reconstructing identity chains from %s", track_pickle)
     reconstruct_from_pickle(
         pickle_in=str(track_pickle),
         pickle_out=None,
         out_subdir=None,
     )
+    logger.info("Finished reconstructing identity chains for %s", track_pickle)
 
     # 5) generate visualization video
     out_vid = (
@@ -137,11 +160,17 @@ def run_pipeline(
         if output_video
         else dest / f"{video_path.stem}_rfid_tracklets_overlay.mp4"
     )
+    logger.info(
+        "Generating visualization video: %s using tracklets %s",
+        out_vid,
+        track_pickle,
+    )
     make_video(
         video_path=str(video_path),
         pickle_path=str(track_pickle),
         centers_txt=str(centers_txt),
         output_video=str(out_vid),
     )
+    logger.info("Finished generating visualization video: %s", out_vid)
 
     return str(out_vid)
