@@ -1,14 +1,14 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 
-import math
 import json
+import math
 from pathlib import Path
-from typing import Dict, List, Tuple, Any, Optional
+from typing import Any, Dict, List, Optional, Tuple
 
+import cv2
 import numpy as np
 import pandas as pd
-import cv2
 
 
 def color_for_id(any_id) -> Tuple[int, int, int]:
@@ -57,10 +57,14 @@ def parse_centers(txt_path: str):
         ncols = col_max - col_min + 1
 
         meta = dict(
-            row_min=row_min, row_max=row_max,
-            col_min=col_min, col_max=col_max,
-            nrows=nrows, ncols=ncols,
-            base_row=row_min, base_col=col_min
+            row_min=row_min,
+            row_max=row_max,
+            col_min=col_min,
+            col_max=col_max,
+            nrows=nrows,
+            ncols=ncols,
+            base_row=row_min,
+            base_col=col_min,
         )
         return centers, meta
 
@@ -80,19 +84,25 @@ def parse_centers(txt_path: str):
         centers[(r, c)] = (float(x), float(y))
 
     meta = dict(
-        row_min=0, row_max=side-1,
-        col_min=0, col_max=side-1,
-        nrows=side, ncols=side,
-        base_row=0, base_col=0
+        row_min=0,
+        row_max=side - 1,
+        col_min=0,
+        col_max=side - 1,
+        nrows=side,
+        ncols=side,
+        base_row=0,
+        base_col=0,
     )
     return centers, meta
 
 
-def centers_to_reader_positions_column_major(centers: Dict[tuple, int], meta: Dict[str, int]):
+def centers_to_reader_positions_column_major(
+    centers: Dict[tuple, int], meta: Dict[str, int]
+):
     """将中心位置转换为列优先编号的读卡器位置"""
     reader_positions = {}
-    nrows = meta['nrows']
-    br, bc = meta['base_row'], meta['base_col']
+    nrows = meta["nrows"]
+    br, bc = meta["base_row"], meta["base_col"]
 
     for (row, col), (x, y) in centers.items():
         r0 = row - br
@@ -103,34 +113,73 @@ def centers_to_reader_positions_column_major(centers: Dict[tuple, int], meta: Di
     return reader_positions
 
 
-def draw_readers_on_frame(frame, reader_positions,
-                         circle_radius=50, circle_color=(0, 255, 0),
-                         circle_thickness=2, center_color=(0, 0, 255),
-                         center_radius=3, text_color=(255, 255, 255),
-                         text_scale=0.6, text_thickness=1):
-    """在帧上绘制读卡器位置"""
+def draw_readers_on_frame(
+    frame,
+    reader_positions,
+    circle_radius: int = 50,
+    circle_color: tuple = (0, 255, 0),
+    circle_thickness: int = 2,
+    center_color: tuple = (0, 0, 255),
+    center_radius: int = 3,
+    text_color: tuple = (255, 255, 255),
+    text_scale: float = 0.6,
+    text_thickness: int = 1,
+    highlight_ids: Optional[set] = None,
+    highlight_color: tuple = (0, 255, 255),
+):
+    """在帧上绘制读卡器位置
+
+    Parameters
+    ----------
+    frame: np.ndarray
+        待绘制的图像帧
+    reader_positions: Dict[int, Tuple[float, float]]
+        读卡器编号到坐标的映射
+    circle_radius, circle_color, circle_thickness, center_color, center_radius,
+    text_color, text_scale, text_thickness: 调整绘制样式的参数
+    highlight_ids: set, optional
+        若提供，则这些读卡器在当前帧有读数，将以 `highlight_color` 绘制
+    highlight_color: tuple
+        用于高亮的 BGR 颜色（默认黄色）
+    """
+
     canvas = frame.copy()
+    highlight_ids = highlight_ids or set()
 
     for rid, (x, y) in reader_positions.items():
         x, y = int(round(x)), int(round(y))
 
+        color = highlight_color if rid in highlight_ids else circle_color
+
         # 绘制读卡器圆圈
-        cv2.circle(canvas, (x, y), circle_radius, circle_color, circle_thickness)
+        cv2.circle(canvas, (x, y), circle_radius, color, circle_thickness)
         cv2.circle(canvas, (x, y), center_radius, center_color, -1)
 
         # 添加ID标签
         text = str(rid)
-        (tw, th), base = cv2.getTextSize(text, cv2.FONT_HERSHEY_SIMPLEX, text_scale, text_thickness)
+        (tw, th), base = cv2.getTextSize(
+            text, cv2.FONT_HERSHEY_SIMPLEX, text_scale, text_thickness
+        )
         tx = x - tw // 2
         ty = y + th // 2
 
         # 半透明背景
         ov = canvas.copy()
-        cv2.rectangle(ov, (tx - 2, ty - th - 2), (tx + tw + 2, ty + base + 2), (0, 0, 0), -1)
+        cv2.rectangle(
+            ov, (tx - 2, ty - th - 2), (tx + tw + 2, ty + base + 2), (0, 0, 0), -1
+        )
         canvas = cv2.addWeighted(canvas, 0.7, ov, 0.3, 0)
 
-        cv2.putText(canvas, text, (tx, ty), cv2.FONT_HERSHEY_SIMPLEX,
-                   text_scale, text_color, text_thickness, cv2.LINE_AA)
+        cv2.putText(
+            canvas,
+            text,
+            (tx, ty),
+            cv2.FONT_HERSHEY_SIMPLEX,
+            text_scale,
+            text_color,
+            text_thickness,
+            cv2.LINE_AA,
+        )
 
     return canvas
 
@@ -157,17 +206,24 @@ def load_rois(roi_path: str):
             parsed = json.loads(text)
 
             # 检查是否为 label->polygon 格式
-            if isinstance(parsed, dict) and all(isinstance(v, list) for v in parsed.values()):
+            if isinstance(parsed, dict) and all(
+                isinstance(v, list) for v in parsed.values()
+            ):
                 for label, pts_list in parsed.items():
-                    if all(isinstance(pt, (list, tuple)) and len(pt) >= 2 for pt in pts_list):
+                    if all(
+                        isinstance(pt, (list, tuple)) and len(pt) >= 2
+                        for pt in pts_list
+                    ):
                         pts = [(int(pt[0]), int(pt[1])) for pt in pts_list]
                         if len(pts) >= 3:
-                            rois.append({
-                                "type": "poly",
-                                "label": str(label),
-                                "pts": pts,
-                                "color": ROI_COLOR_DEFAULT
-                            })
+                            rois.append(
+                                {
+                                    "type": "poly",
+                                    "label": str(label),
+                                    "pts": pts,
+                                    "color": ROI_COLOR_DEFAULT,
+                                }
+                            )
         except Exception:
             pass
 
@@ -186,7 +242,12 @@ def draw_rois(frame, rois, line_thick: int = 2, alpha_fill: float = 0.12):
         color = tuple(int(c) for c in roi.get("color", (80, 160, 240)))
 
         if roi["type"] == "rect":
-            x1, y1, x2, y2 = int(roi["x1"]), int(roi["y1"]), int(roi["x2"]), int(roi["y2"])
+            x1, y1, x2, y2 = (
+                int(roi["x1"]),
+                int(roi["y1"]),
+                int(roi["x2"]),
+                int(roi["y2"]),
+            )
             cv2.rectangle(canvas, (x1, y1), (x2, y2), color, line_thick, cv2.LINE_AA)
             cv2.rectangle(overlay, (x1, y1), (x2, y2), color, -1)
             cx = (x1 + x2) // 2
@@ -198,8 +259,14 @@ def draw_rois(frame, rois, line_thick: int = 2, alpha_fill: float = 0.12):
             cx, cy = x, y - r - 8
         else:  # poly
             pts = np.array(roi["pts"], dtype=np.int32).reshape(-1, 1, 2)
-            cv2.polylines(canvas, [pts], isClosed=True, color=color,
-                         thickness=line_thick, lineType=cv2.LINE_AA)
+            cv2.polylines(
+                canvas,
+                [pts],
+                isClosed=True,
+                color=color,
+                thickness=line_thick,
+                lineType=cv2.LINE_AA,
+            )
             cv2.fillPoly(overlay, [pts], color)
             arr = np.array(roi["pts"], dtype=np.float32)
             cx = int(arr[:, 0].mean())
@@ -217,8 +284,16 @@ def draw_rois(frame, rois, line_thick: int = 2, alpha_fill: float = 0.12):
             lab_overlay = canvas.copy()
             cv2.rectangle(lab_overlay, (bx1, by1), (bx2, by2), (0, 0, 0), -1)
             canvas = cv2.addWeighted(canvas, 0.75, lab_overlay, 0.25, 0)
-            cv2.putText(canvas, label, (bx1 + 4, by2 - base - 2),
-                       cv2.FONT_HERSHEY_SIMPLEX, 0.6, (255, 255, 255), 2, cv2.LINE_AA)
+            cv2.putText(
+                canvas,
+                label,
+                (bx1 + 4, by2 - base - 2),
+                cv2.FONT_HERSHEY_SIMPLEX,
+                0.6,
+                (255, 255, 255),
+                2,
+                cv2.LINE_AA,
+            )
 
     # 应用半透明填充
     canvas = cv2.addWeighted(canvas, 1.0, overlay, alpha_fill, 0)
@@ -242,14 +317,18 @@ def point_in_poly(x: int, y: int, pts: List[Tuple[int, int]]) -> bool:
     xj, yj = pts[-1]
     for i in range(n):
         xi, yi = pts[i]
-        if ((yi > y) != (yj > y)) and (x < (xj - xi) * (y - yi) / ((yj - yi) + 1e-12) + xi):
+        if ((yi > y) != (yj > y)) and (
+            x < (xj - xi) * (y - yi) / ((yj - yi) + 1e-12) + xi
+        ):
             inside = not inside
         xj, yj = xi, yi
 
     return inside
 
 
-def point_in_any_roi(pt: Optional[Tuple[float, float]], rois: List[Dict[str, Any]]) -> bool:
+def point_in_any_roi(
+    pt: Optional[Tuple[float, float]], rois: List[Dict[str, Any]]
+) -> bool:
     """测试点是否在任何ROI内"""
     if not rois or pt is None:
         return False
@@ -260,7 +339,9 @@ def point_in_any_roi(pt: Optional[Tuple[float, float]], rois: List[Dict[str, Any
     for r in rois:
         t = r["type"]
         if t == "rect":
-            if point_in_rect(x, y, int(r["x1"]), int(r["y1"]), int(r["x2"]), int(r["y2"])):
+            if point_in_rect(
+                x, y, int(r["x1"]), int(r["y1"]), int(r["x2"]), int(r["y2"])
+            ):
                 return True
         elif t == "circle":
             dx = x - int(r["x"])
