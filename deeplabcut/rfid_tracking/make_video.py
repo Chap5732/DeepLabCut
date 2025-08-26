@@ -13,9 +13,10 @@ from pathlib import Path
 from collections import defaultdict, deque
 import cv2
 import numpy as np
-from utils import (
-    load_tracklets_pickle, frame_idx_from_key, find_mouse_center_index,
-    body_center_from_arr, color_for_id, parse_centers,
+from .io import load_tracklets_pickle
+from .dlc_tools import frame_idx_from_key, find_mouse_center_index, body_center_from_arr
+from .visualization import (
+    color_for_id, parse_centers,
     centers_to_reader_positions_column_major, draw_readers_on_frame,
     load_rois, draw_rois
 )

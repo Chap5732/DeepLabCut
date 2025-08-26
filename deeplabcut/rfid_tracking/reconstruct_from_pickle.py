@@ -19,10 +19,8 @@ import time
 import numpy as np
 import pandas as pd
 
-from utils import (
-    load_tracklets_pickle, save_pickle_safely, frame_idx_from_key,
-    find_mouse_center_index, body_center_from_arr
-)
+from .io import load_tracklets_pickle, save_pickle_safely
+from .dlc_tools import frame_idx_from_key, find_mouse_center_index, body_center_from_arr
 
 # ================== 配置参数 ==================
 # 输入输出路径
