@@ -1,90 +1,145 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 
-"""
+"""Video visualization script: overlay tracklet trajectories, RFID events,
+and reconstructed chains on the original video
 视频可视化脚本：在原视频上叠加tracklet轨迹、RFID事件和重建链信息
+
+- Supports drawing reader positions and ROI areas
 - 支持绘制读卡器位置、ROI区域
+- Displays tracklet trajectories and RFID tag detections
 - 显示tracklet轨迹和RFID标签检测事件
+- Shows reconstructed identity chains with legends (non-overlapping with tracklet labels)
 - 显示重建后的身份链和图例（与tracklet标签不重叠）
 """
 
 from __future__ import annotations
-from pathlib import Path
+
 from collections import defaultdict, deque
+from pathlib import Path
+
 import cv2
 import numpy as np
 from utils import (
-    load_tracklets_pickle, frame_idx_from_key, find_mouse_center_index,
-    body_center_from_arr, color_for_id, parse_centers,
-    centers_to_reader_positions_column_major, draw_readers_on_frame,
-    load_rois, draw_rois
+    body_center_from_arr,
+    centers_to_reader_positions_column_major,
+    color_for_id,
+    draw_readers_on_frame,
+    draw_rois,
+    find_mouse_center_index,
+    frame_idx_from_key,
+    load_rois,
+    load_tracklets_pickle,
+    parse_centers,
 )
 
-# ================== 配置参数 ==================
+# ================== Configuration ==================
+# 配置参数
+# File paths
 # 文件路径
 VIDEO_PATH = "/ssd01/user_acc_data/oppa/deeplabcut/videos/test/demo.mp4"
 PICKLE_PATH = "/ssd01/user_acc_data/oppa/deeplabcut/projects/MiceTrackerFor20-Oppa-2024-12-08/analyze_videos/shuffle3/demo1/velocity_gating/CAP15/demoDLC_HrnetW32_MiceTrackerFor20Dec8shuffle3_detector_best-250_snapshot_best-190_el.pickle"
+# Output to specified file
 # 输出到指定文件夹
 OUTPUT_VIDEO = "/ssd01/user_acc_data/oppa/deeplabcut/projects/MiceTrackerFor20-Oppa-2024-12-08/analyze_videos/shuffle3/demo1/velocity_gating/CAP15/demo_tracked.mp4"
 
+# Reader visualization
 # 读卡器可视化
 DRAW_READERS = True
 CENTERS_TXT = "/ssd01/user_acc_data/oppa/analysis/data/jc0813/readers_centers.txt"
 
+# ROI visualization
 # ROI可视化
 DRAW_ROIS = True
 ROI_FILE = "/ssd01/user_acc_data/oppa/analysis/rfid_dlc_tracking/version2_tracking/roi_definitions.json"
 
+# Tracklet parameters
 # 轨迹参数
-PCUTOFF = 0.35                # 置信度阈值
-TRAIL_LEN = 15                # tracklet轨迹长度
-TAG_HOLD_FRAMES = 3           # RFID标签显示持续帧数
+PCUTOFF = 0.35  # Confidence threshold
+TRAIL_LEN = 15  # Tracklet trail length
+TAG_HOLD_FRAMES = 3  # Frames to keep RFID tag labels
 
+# Identity-chain visualization
 # 身份链可视化
-SHOW_CHAIN = True             # 是否显示重建的身份链
-CHAIN_FALLBACK_ID = True      # 是否使用chain_id作为回退
-CHAIN_TRAIL_LEN = 40          # 身份链轨迹长度
-CHAIN_LINE_THICK = 3          # 身份链线条粗细
-CHAIN_POINT_R = 5             # 身份链端点半径
+SHOW_CHAIN = True  # Show reconstructed identity chains
+CHAIN_FALLBACK_ID = True  # Use chain_id as fallback
+CHAIN_TRAIL_LEN = 40  # Identity-chain trail length
+CHAIN_LINE_THICK = 3  # Identity-chain line thickness
+CHAIN_POINT_R = 5  # Identity-chain point radius
 
+# Legend settings
 # 图例设置
-DRAW_LEGEND = True            # 是否绘制图例
-LEGEND_COLS = 2               # 图例列数
-LEGEND_POS = (20, 40)         # 图例位置
+DRAW_LEGEND = True  # Draw legend
+LEGEND_COLS = 2  # Legend columns
+LEGEND_POS = (20, 40)  # Legend position
 
+# Output limit
 # 输出限制
-MAX_FRAMES = None             # 最大输出帧数（None=全部）
+MAX_FRAMES = None  # Maximum output frames (None=all)
 
+# ================== Helpers ==================
 # ================== 小工具 ==================
-def draw_label_with_bg(img, text, org, font_scale=0.6, thickness=2, fg=(255,255,255), bg=(0,0,0), alpha=0.4, padding=4):
-    """在文字下绘制半透明背景框，提升可读性"""
-    (tw, th), base = cv2.getTextSize(text, cv2.FONT_HERSHEY_SIMPLEX, font_scale, thickness)
+def draw_label_with_bg(
+    img,
+    text,
+    org,
+    font_scale=0.6,
+    thickness=2,
+    fg=(255, 255, 255),
+    bg=(0, 0, 0),
+    alpha=0.4,
+    padding=4,
+):
+    """Draw a semi-transparent background behind text for readability
+    在文字下绘制半透明背景框，提升可读性
+    """
+    (tw, th), base = cv2.getTextSize(
+        text, cv2.FONT_HERSHEY_SIMPLEX, font_scale, thickness
+    )
     x, y = org
     x0, y0 = x - padding, y - th - padding
     x1, y1 = x + tw + padding, y + base + padding
     overlay = img.copy()
     cv2.rectangle(overlay, (x0, y0), (x1, y1), bg, -1)
     cv2.addWeighted(overlay, alpha, img, 1 - alpha, 0, img)
-    cv2.putText(img, text, (x, y), cv2.FONT_HERSHEY_SIMPLEX, font_scale, fg, thickness, cv2.LINE_AA)
+    cv2.putText(
+        img,
+        text,
+        (x, y),
+        cv2.FONT_HERSHEY_SIMPLEX,
+        font_scale,
+        fg,
+        thickness,
+        cv2.LINE_AA,
+    )
+
 
 def safe_find_mouse_center_index(header):
-    """header 非 dict 时按 None 处理，避免 utils 内部假设"""
+    """Treat ``header`` as ``None`` if it is not a dict to avoid assumptions in utils
+    header 非 dict 时按 None 处理，避免 utils 内部假设
+    """
     if not isinstance(header, dict):
         header = None
     return find_mouse_center_index(header)
 
+
+# ================== Data processing ==================
 # ================== 数据处理 ==================
 def build_per_frame_struct(dd: dict, pcutoff: float):
-    """构建按帧组织的数据结构"""
+    """Build per-frame data structures
+    构建按帧组织的数据结构
+    """
     header = dd.get("header", None)
     mc_idx = safe_find_mouse_center_index(header)
 
+    # Tracklet-related data
     # tracklet相关数据
     frame2tk_center = defaultdict(list)
     tk_trail = {}
     frames_set = set()
     chain_key_of_tk = {}
 
+    # Process each tracklet
     # 处理每个tracklet
     for tk, node in dd.items():
         if tk in ("header", "single"):
@@ -94,9 +149,17 @@ def build_per_frame_struct(dd: dict, pcutoff: float):
 
         tk_trail[tk] = deque(maxlen=TRAIL_LEN)
 
+        # Extract the center point for each frame
         # 提取每帧的中心点
         for fkey, arr in node.items():
-            if fkey in ("rfid_frames", "rfid_counts", "tag", "rfid_hint", "chain_tag", "chain_id"):
+            if fkey in (
+                "rfid_frames",
+                "rfid_counts",
+                "tag",
+                "rfid_hint",
+                "chain_tag",
+                "chain_id",
+            ):
                 continue
             try:
                 fi = frame_idx_from_key(fkey)
@@ -112,12 +175,14 @@ def build_per_frame_struct(dd: dict, pcutoff: float):
             frame2tk_center[int(fi)].append((tk, (float(c[0]), float(c[1]))))
             frames_set.add(int(fi))
 
+        # Determine chain key (chain_tag priority, then tag, then chain_id fallback)
         # 获取身份链键（chain_tag 优先，其次原始 tag，最后 fallback 到 chain_id）
         chain_key = node.get("chain_tag") or node.get("tag")
         if chain_key is None and CHAIN_FALLBACK_ID:
             chain_key = node.get("chain_id")
         chain_key_of_tk[tk] = str(chain_key) if chain_key is not None else None
 
+    # Build RFID event mapping
     # 构建RFID事件映射
     tk_rfid_events = defaultdict(lambda: defaultdict(list))
     for tk, node in dd.items():
@@ -136,6 +201,7 @@ def build_per_frame_struct(dd: dict, pcutoff: float):
                     continue
                 tk_rfid_events[tk][fr].append(str(tag))
 
+    # Build per-frame data for identity chains (each chain shown once per frame)
     # 构建身份链的每帧数据（一个 chain 在同一帧只显示一次）
     frame2chain_center = defaultdict(list)
     chain_seen_in_frame = defaultdict(set)
@@ -150,6 +216,7 @@ def build_per_frame_struct(dd: dict, pcutoff: float):
             frame2chain_center[f].append((ck, c))
             chain_seen_in_frame[f].add(ck)
 
+    # Initialize identity-chain trails
     # 初始化身份链轨迹
     chain_trail = {}
     for f, items in frame2chain_center.items():
@@ -158,39 +225,65 @@ def build_per_frame_struct(dd: dict, pcutoff: float):
                 chain_trail[ck] = deque(maxlen=CHAIN_TRAIL_LEN)
 
     frames_sorted = sorted(frames_set)
-    return (frames_sorted, frame2tk_center, tk_rfid_events, tk_trail,
-            chain_key_of_tk, frame2chain_center, chain_trail)
+    return (
+        frames_sorted,
+        frame2tk_center,
+        tk_rfid_events,
+        tk_trail,
+        chain_key_of_tk,
+        frame2chain_center,
+        chain_trail,
+    )
 
+
+# ================== Drawing functions ==================
 # ================== 绘制函数 ==================
 def draw_tracklets_layer(frame, frame_idx, pts_in_frame, tk_rfid_events, tk_trail):
-    """绘制tracklet轨迹层（ID 放在点下方；RFID 提示再更下方）"""
+    """Draw tracklet layer (ID below the point; RFID hints even lower)
+    绘制tracklet轨迹层（ID 放在点下方；RFID 提示再更下方）
+    """
     canvas = frame.copy()
 
+    # Update trails
     # 更新轨迹
     for tk, (x, y) in pts_in_frame:
         tk_trail.setdefault(tk, deque(maxlen=TRAIL_LEN))
         tk_trail[tk].append((int(round(x)), int(round(y))))
 
+    # Draw each tracklet
     # 绘制每个tracklet
     for tk, (x, y) in pts_in_frame:
         xi, yi = int(round(x)), int(round(y))
         color = color_for_id(tk)
 
+        # Trail line
         # 轨迹线
         trail = list(tk_trail[tk])
         for i in range(1, len(trail)):
-            cv2.line(canvas, trail[i-1], trail[i], color, 2, cv2.LINE_AA)
+            cv2.line(canvas, trail[i - 1], trail[i], color, 2, cv2.LINE_AA)
 
+        # Current point
         # 当前位置点
         cv2.circle(canvas, (xi, yi), 5, color, -1, cv2.LINE_AA)
 
+        # Tracklet ID (placed below)
         # tracklet ID（放下方）
         id_text = f"{tk}"
         (tw, th), base = cv2.getTextSize(id_text, cv2.FONT_HERSHEY_SIMPLEX, 0.6, 2)
         text_org = (xi - tw // 2, yi + th + 8)  # 下方
-        draw_label_with_bg(canvas, id_text, text_org, font_scale=0.6, thickness=2,
-                           fg=(255,255,255), bg=(0,0,0), alpha=0.35, padding=4)
+        draw_label_with_bg(
+            canvas,
+            id_text,
+            text_org,
+            font_scale=0.6,
+            thickness=2,
+            fg=(255, 255, 255),
+            bg=(0, 0, 0),
+            alpha=0.35,
+            padding=4,
+        )
 
+        # RFID tags (even lower)
         # RFID 标签（再更下方）
         tags_to_show = []
         for df in range(TAG_HOLD_FRAMES):
@@ -203,44 +296,78 @@ def draw_tracklets_layer(frame, frame_idx, pts_in_frame, tk_rfid_events, tk_trai
             tag_text = f"{', '.join(sorted(set(tags_to_show)))} tag received"
             (tw2, th2), _ = cv2.getTextSize(tag_text, cv2.FONT_HERSHEY_SIMPLEX, 0.6, 2)
             text_org2 = (xi - tw2 // 2, yi + th + 8 + th2 + 8)  # 再往下
-            draw_label_with_bg(canvas, tag_text, text_org2, font_scale=0.6, thickness=2,
-                               fg=(255,255,255), bg=(0,0,0), alpha=0.35, padding=4)
+            draw_label_with_bg(
+                canvas,
+                tag_text,
+                text_org2,
+                font_scale=0.6,
+                thickness=2,
+                fg=(255, 255, 255),
+                bg=(0, 0, 0),
+                alpha=0.35,
+                padding=4,
+            )
 
     return canvas
 
+
 def draw_chain_layer(frame, frame_idx, frame2chain_center, chain_trail):
-    """绘制身份链轨迹层（chain ID 放上方；颜色固定且与 tracklet 解耦）"""
+    """Draw identity-chain layer (chain ID above; color decoupled from tracklets)
+    绘制身份链轨迹层（chain ID 放上方；颜色固定且与 tracklet 解耦）
+    """
     canvas = frame.copy()
     items = frame2chain_center.get(frame_idx, [])
 
+    # Update identity-chain trails
     # 更新身份链轨迹
     for ck, (x, y) in items:
         chain_trail.setdefault(ck, deque(maxlen=CHAIN_TRAIL_LEN))
         chain_trail[ck].append((int(round(x)), int(round(y))))
 
+    # Draw each identity chain
     # 绘制每个身份链
     for ck, _ in items:
-        color = color_for_id(f"chain:{ck}")  # 与 tracklet 颜色解耦，保证每个 chain 固定颜色
+        color = color_for_id(
+            f"chain:{ck}"
+        )  # Color decoupled from tracklets to keep each chain stable
+        # 与 tracklet 颜色解耦，保证每个 chain 固定颜色
         trail = list(chain_trail[ck])
 
+        # Trail line
         # 轨迹线
         for i in range(1, len(trail)):
-            cv2.line(canvas, trail[i-1], trail[i], color, CHAIN_LINE_THICK, cv2.LINE_AA)
+            cv2.line(
+                canvas, trail[i - 1], trail[i], color, CHAIN_LINE_THICK, cv2.LINE_AA
+            )
 
+        # Current point and label (label above)
         # 当前位置点和标签（标签放上方）
         if trail:
             xi, yi = trail[-1]
             cv2.circle(canvas, (xi, yi), CHAIN_POINT_R, color, -1, cv2.LINE_AA)
             label = str(ck)
             (tw, th), base = cv2.getTextSize(label, cv2.FONT_HERSHEY_SIMPLEX, 0.6, 2)
-            text_org = (xi - tw // 2, yi - CHAIN_POINT_R - 10)  # 上方
-            draw_label_with_bg(canvas, label, text_org, font_scale=0.6, thickness=2,
-                               fg=(255,255,255), bg=color, alpha=0.35, padding=4)
+            text_org = (xi - tw // 2, yi - CHAIN_POINT_R - 10)  # Above
+            # 上方
+            draw_label_with_bg(
+                canvas,
+                label,
+                text_org,
+                font_scale=0.6,
+                thickness=2,
+                fg=(255, 255, 255),
+                bg=color,
+                alpha=0.35,
+                padding=4,
+            )
 
     return canvas
 
+
 def draw_chain_legend(frame, chain_trail, pos=(20, 40), cols=2):
-    """绘制身份链图例（颜色与链颜色一致）"""
+    """Draw legend for identity chains (colors consistent with chain colors)
+    绘制身份链图例（颜色与链颜色一致）
+    """
     items = sorted(chain_trail.keys(), key=lambda x: str(x))
     if not items:
         return frame
@@ -258,62 +385,98 @@ def draw_chain_legend(frame, chain_trail, pos=(20, 40), cols=2):
 
         color = color_for_id(f"chain:{ck}")
         cv2.circle(canvas, (x, y), 8, color, -1, cv2.LINE_AA)
-        cv2.putText(canvas, str(ck), (x + 14, y + 6),
-                    cv2.FONT_HERSHEY_SIMPLEX, 0.6, (255, 255, 255), 2, cv2.LINE_AA)
+        cv2.putText(
+            canvas,
+            str(ck),
+            (x + 14, y + 6),
+            cv2.FONT_HERSHEY_SIMPLEX,
+            0.6,
+            (255, 255, 255),
+            2,
+            cv2.LINE_AA,
+        )
 
     return canvas
 
+
+# ================== Main function ==================
 # ================== 主函数 ==================
 def main():
-    """主函数"""
+    """Main entry point
+    主函数
+    """
+    # Check whether files exist
     # 检查文件是否存在
-    for pth, msg in [(VIDEO_PATH, "视频"), (PICKLE_PATH, "pickle")]:
+    for pth, msg in [(VIDEO_PATH, "video"), (PICKLE_PATH, "pickle")]:
         if not Path(pth).exists():
-            print(f"错误：{msg}文件不存在: {pth}")
+            print(f"Error: {msg} file not found: {pth} 错误：{msg}文件不存在")
             return
 
+    # Load data
     # 加载数据
-    print("正在加载tracklet数据...")
+    print("Loading tracklet data... 正在加载tracklet数据...")
     dd = load_tracklets_pickle(PICKLE_PATH)
 
-    print("构建每帧数据结构...")
-    (frames_sorted, frame2tk_center, tk_rfid_events, tk_trail,
-     chain_key_of_tk, frame2chain_center, chain_trail) = build_per_frame_struct(dd, PCUTOFF)
+    print("Building per-frame data structures... 构建每帧数据结构...")
+    (
+        frames_sorted,
+        frame2tk_center,
+        tk_rfid_events,
+        tk_trail,
+        chain_key_of_tk,
+        frame2chain_center,
+        chain_trail,
+    ) = build_per_frame_struct(dd, PCUTOFF)
 
-    print(f"发现 {len(tk_trail)} 个tracklet，包含 {len(frames_sorted)} 个有效帧")
-    print(f"检测到 {len([k for k in set(chain_key_of_tk.values()) if k])} 个身份键")
+    print(f"Found {len(tk_trail)} tracklets with {len(frames_sorted)} valid frames")
+    print(f"Detected {len([k for k in set(chain_key_of_tk.values()) if k])} chain keys")
 
+    # Load reader positions (optional)
     # 加载读卡器位置（可选）
     reader_positions = None
     if DRAW_READERS and Path(CENTERS_TXT).exists():
         centers, meta = parse_centers(CENTERS_TXT)
         reader_positions = centers_to_reader_positions_column_major(centers, meta)
-        print(f"读取到 {len(reader_positions)} 个读卡器位置")
+        print(
+            f"Loaded {len(reader_positions)} reader positions 读取到 {len(reader_positions)} 个读卡器位置"
+        )
 
+    # Load ROIs (optional)
     # 加载ROI（可选）
-    rois = load_rois(ROI_FILE) if (DRAW_ROIS and ROI_FILE and Path(ROI_FILE).exists()) else []
+    rois = (
+        load_rois(ROI_FILE)
+        if (DRAW_ROIS and ROI_FILE and Path(ROI_FILE).exists())
+        else []
+    )
     if rois:
-        print(f"加载了 {len(rois)} 个ROI区域")
+        print(f"Loaded {len(rois)} ROI regions 加载了 {len(rois)} 个ROI区域")
 
+    # Open video
     # 打开视频
     cap = cv2.VideoCapture(VIDEO_PATH)
     if not cap.isOpened():
-        print("错误：无法打开视频文件")
+        print("Error: unable to open video file 错误：无法打开视频文件")
         return
 
+    # Obtain video info
     # 获取视频信息
     fps = cap.get(cv2.CAP_PROP_FPS)
     W = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
     H = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
     T = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
 
+    # Set up output video
     # 设置输出视频
-    fourcc = cv2.VideoWriter_fourcc(*'mp4v')
+    fourcc = cv2.VideoWriter_fourcc(*"mp4v")
     out = cv2.VideoWriter(OUTPUT_VIDEO, fourcc, fps if fps > 0 else 25.0, (W, H))
 
     max_frames = T if MAX_FRAMES is None else min(T, MAX_FRAMES)
-    print(f"视频信息: {W}x{H}, {fps:.2f}fps, 共 {T} 帧；将输出 {max_frames} 帧")
+    print(
+        f"Video info: {W}x{H}, {fps:.2f}fps, total {T} frames; output {max_frames} frames"
+    )
+    # 视频信息: {W}x{H}, {fps:.2f}fps, 共 {T} 帧；将输出 {max_frames} 帧
 
+    # Process video frames
     # 处理视频帧
     valid_frames = set(frame2tk_center.keys())
     fidx = 0
@@ -329,37 +492,49 @@ def main():
 
         canvas = frame
 
+        # Draw ROI areas
         # 绘制ROI区域
         if rois:
             canvas = draw_rois(canvas, rois)
 
+        # Draw reader positions
         # 绘制读卡器位置
         if reader_positions is not None:
             canvas = draw_readers_on_frame(canvas, reader_positions)
 
+        # Draw tracklet trails
         # 绘制tracklet轨迹
         if fidx in valid_frames:
             pts = frame2tk_center[fidx]
             canvas = draw_tracklets_layer(canvas, fidx, pts, tk_rfid_events, tk_trail)
 
+        # Draw identity chains
         # 绘制身份链
         if SHOW_CHAIN:
             canvas = draw_chain_layer(canvas, fidx, frame2chain_center, chain_trail)
             if DRAW_LEGEND:
-                canvas = draw_chain_legend(canvas, chain_trail, pos=LEGEND_POS, cols=LEGEND_COLS)
+                canvas = draw_chain_legend(
+                    canvas, chain_trail, pos=LEGEND_POS, cols=LEGEND_COLS
+                )
 
+        # Write to output video
         # 写入输出视频
         out.write(canvas)
 
+        # Progress display
         # 进度显示
         if fidx % 50 == 0:
-            print(f"已处理 {fidx}/{max_frames} 帧 ({fidx/max_frames*100:.1f}%)")
+            print(
+                f"Processed {fidx}/{max_frames} frames ({fidx/max_frames*100:.1f}%) 已处理 {fidx}/{max_frames} 帧"
+            )
 
+    # Release resources
     # 清理资源
     cap.release()
     out.release()
     cv2.destroyAllWindows()
-    print(f"[OK] 完成！输出视频: {OUTPUT_VIDEO}")
+    print(f"[OK] Done! Output video: {OUTPUT_VIDEO} 完成！输出视频: {OUTPUT_VIDEO}")
+
 
 if __name__ == "__main__":
     main()
