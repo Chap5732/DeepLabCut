@@ -3,7 +3,9 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Optional
 
-from . import make_video, match_rfid_to_tracklets, reconstruct_from_pickle
+from .make_video import main as make_video
+from .match_rfid_to_tracklets import main as match_rfid_to_tracklets
+from .reconstruct_from_pickle import main as reconstruct_from_pickle
 
 
 def run_pipeline(
@@ -88,31 +90,32 @@ def run_pipeline(
     track_pickle = dest / f"{video_path.stem}{dlc_scorer}_{method_suffix}.pickle"
 
     # 3) match RFID events to tracklets
-    mrf = match_rfid_to_tracklets
-    mrf.PICKLE_PATH = str(track_pickle)
-    mrf.RFID_CSV = rfid_csv
-    mrf.CENTERS_TXT = centers_txt
-    mrf.TS_CSV = ts_csv
-    mrf.OUT_DIR = None
-    mrf.main()
+    match_rfid_to_tracklets(
+        pickle_path=str(track_pickle),
+        rfid_csv=rfid_csv,
+        centers_txt=centers_txt,
+        ts_csv=ts_csv,
+        out_dir=None,
+    )
 
     # 4) reconstruct identity chains
-    rec = reconstruct_from_pickle
-    rec.PICKLE_IN = str(track_pickle)
-    rec.PICKLE_OUT = None
-    rec.OUT_SUBDIR = None
-    rec.main()
+    reconstruct_from_pickle(
+        pickle_in=str(track_pickle),
+        pickle_out=None,
+        out_subdir=None,
+    )
 
     # 5) generate visualization video
-    mkv = make_video
-    mkv.VIDEO_PATH = str(video_path)
-    mkv.PICKLE_PATH = str(track_pickle)
-    mkv.CENTERS_TXT = centers_txt
-    mkv.OUTPUT_VIDEO = (
-        str(Path(output_video))
+    out_vid = (
+        Path(output_video)
         if output_video
-        else str(dest / f"{video_path.stem}_rfid_tracklets_overlay.mp4")
+        else dest / f"{video_path.stem}_rfid_tracklets_overlay.mp4"
     )
-    mkv.main()
+    make_video(
+        video_path=str(video_path),
+        pickle_path=str(track_pickle),
+        centers_txt=centers_txt,
+        output_video=str(out_vid),
+    )
 
-    return mkv.OUTPUT_VIDEO
+    return str(out_vid)

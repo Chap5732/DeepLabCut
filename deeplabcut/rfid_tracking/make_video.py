@@ -364,17 +364,28 @@ def draw_chain_legend(frame, chain_trail, pos=(20, 40), cols=2):
 
 
 # ================== 主函数 ==================
-def main():
+def main(
+    *,
+    video_path: str | None = None,
+    pickle_path: str | None = None,
+    centers_txt: str | None = None,
+    output_video: str | None = None,
+) -> None:
     """主函数"""
+    video_path = video_path or VIDEO_PATH
+    pickle_path = pickle_path or PICKLE_PATH
+    centers_txt = centers_txt or CENTERS_TXT
+    output_video = output_video or OUTPUT_VIDEO
+
     # 检查文件是否存在
-    for pth, msg in [(VIDEO_PATH, "视频"), (PICKLE_PATH, "pickle")]:
+    for pth, msg in [(video_path, "视频"), (pickle_path, "pickle")]:
         if not Path(pth).exists():
             print(f"错误：{msg}文件不存在: {pth}")
             return
 
     # 加载数据
     print("正在加载tracklet数据...")
-    dd = load_tracklets_pickle(PICKLE_PATH)
+    dd = load_tracklets_pickle(pickle_path)
 
     print("构建每帧数据结构...")
     (
@@ -392,8 +403,8 @@ def main():
 
     # 加载读卡器位置（可选）
     reader_positions = None
-    if DRAW_READERS and Path(CENTERS_TXT).exists():
-        centers, meta = parse_centers(CENTERS_TXT)
+    if DRAW_READERS and Path(centers_txt).exists():
+        centers, meta = parse_centers(centers_txt)
         reader_positions = centers_to_reader_positions_column_major(centers, meta)
         print(f"读取到 {len(reader_positions)} 个读卡器位置")
 
@@ -407,7 +418,7 @@ def main():
         print(f"加载了 {len(rois)} 个ROI区域")
 
     # 打开视频
-    cap = cv2.VideoCapture(VIDEO_PATH)
+    cap = cv2.VideoCapture(video_path)
     if not cap.isOpened():
         print("错误：无法打开视频文件")
         return
@@ -420,7 +431,7 @@ def main():
 
     # 设置输出视频
     fourcc = cv2.VideoWriter_fourcc(*"mp4v")
-    out = cv2.VideoWriter(OUTPUT_VIDEO, fourcc, fps if fps > 0 else 25.0, (W, H))
+    out = cv2.VideoWriter(output_video, fourcc, fps if fps > 0 else 25.0, (W, H))
 
     max_frames = T if MAX_FRAMES is None else min(T, MAX_FRAMES)
     print(f"视频信息: {W}x{H}, {fps:.2f}fps, 共 {T} 帧；将输出 {max_frames} 帧")
@@ -477,7 +488,7 @@ def main():
     cap.release()
     out.release()
     cv2.destroyAllWindows()
-    print(f"[OK] 完成！输出视频: {OUTPUT_VIDEO}")
+    print(f"[OK] 完成！输出视频: {output_video}")
 
 
 if __name__ == "__main__":
