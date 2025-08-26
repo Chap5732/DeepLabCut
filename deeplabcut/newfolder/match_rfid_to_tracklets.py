@@ -17,6 +17,7 @@ import json
 import pickle
 from pathlib import Path
 from collections import defaultdict
+import argparse
 
 import numpy as np
 import pandas as pd
@@ -25,12 +26,11 @@ import pandas as pd
 # ====== 用户配置区 =========
 # ==========================
 
-# ---- 路径 ----
-PICKLE_PATH = "/ssd01/user_acc_data/oppa/deeplabcut/projects/MiceTrackerFor20-Oppa-2024-12-08/analyze_videos/shuffle3/demo1/velocity_gating/demoDLC_HrnetW32_MiceTrackerFor20Dec8shuffle3_detector_best-250_snapshot_best-190_el.pickle"
-RFID_CSV    = "/ssd01/user_acc_data/oppa/analysis/data/jc0813/rfid_data_20250813_055827.csv"
-CENTERS_TXT = "/ssd01/user_acc_data/oppa/analysis/data/jc0813/readers_centers.txt"
-TS_CSV      = "/ssd01/user_acc_data/oppa/analysis/data/jc0813/record_20250813_053913_timestamps.csv"
-OUT_DIR     = None  # None -> 与 pickle 同目录创建 rfid_match_outputs/
+# ---- 路径（默认当前目录）----
+PICKLE_DEFAULT = Path.cwd() / "tracklets.pickle"
+RFID_CSV_DEFAULT = Path.cwd() / "rfid.csv"
+CENTERS_TXT_DEFAULT = Path.cwd() / "readers_centers.txt"
+TS_CSV_DEFAULT = Path.cwd() / "timestamps.csv"
 
 # ---- 阵列/网格配置（很关键）----
 N_ROWS  = 12           # 行数
@@ -69,10 +69,36 @@ LOWHITS_THRESHOLD         = 200
 # ====== 工具函数 ===========
 # ==========================
 
-def ensure_out_dir(pickle_path: str) -> Path:
-    out = Path(OUT_DIR) if OUT_DIR else (Path(pickle_path).parent / "rfid_match_outputs")
+def ensure_out_dir(pickle_path: str, out_dir: str | None) -> Path:
+    out = Path(out_dir) if out_dir else (Path(pickle_path).parent / "rfid_match_outputs")
     out.mkdir(parents=True, exist_ok=True)
     return out
+
+
+def parse_args():
+    parser = argparse.ArgumentParser(
+        description="Match RFID readings to tracklets"
+    )
+    parser.add_argument(
+        "--pickle", type=Path, default=PICKLE_DEFAULT, help="Tracklets pickle path"
+    )
+    parser.add_argument(
+        "--rfid-csv", type=Path, default=RFID_CSV_DEFAULT, help="RFID CSV file"
+    )
+    parser.add_argument(
+        "--centers-txt", type=Path, default=CENTERS_TXT_DEFAULT, help="Reader centers txt"
+    )
+    parser.add_argument(
+        "--timestamps-csv", type=Path, default=TS_CSV_DEFAULT, help="Timestamps CSV"
+    )
+    parser.add_argument(
+        "--out-dir", default=None, help="Output directory (optional)"
+    )
+    args = parser.parse_args()
+    for p in [args.pickle, args.rfid_csv, args.centers_txt, args.timestamps_csv]:
+        if not Path(p).is_file():
+            parser.error(f"Required file not found: {p}")
+    return args
 
 def load_centers_txt(txt_path: str) -> np.ndarray:
     arr = np.loadtxt(txt_path, dtype=float)
@@ -365,10 +391,11 @@ def assign_tag_for_one_tracklet(
 # ==========================
 
 def main():
-    out_dir = ensure_out_dir(PICKLE_PATH)
+    args = parse_args()
+    out_dir = ensure_out_dir(str(args.pickle), args.out_dir)
 
     # 1) 加载并按坐标重排为行优先网格
-    centers_raw = load_centers_txt(CENTERS_TXT)
+    centers_raw = load_centers_txt(str(args.centers_txt))
     idx_map, centers_grid = build_row_major_index(centers_raw, N_ROWS, N_COLS, Y_TOP_TO_BOTTOM)
     centers = centers_raw  # 通过 idx_map 访问
 
@@ -379,9 +406,9 @@ def main():
     print("[grid] bottom-right id", N_ROWS*N_COLS-1,  "->", centers_grid[N_ROWS-1, N_COLS-1])
 
     # 2) 读 timestamps / RFID / tracklets
-    frames_arr, times_arr = parse_timestamps_csv(TS_CSV)
-    df_rfid = parse_rfid_csv(RFID_CSV)
-    dd = load_tracklets_pickle(PICKLE_PATH)
+    frames_arr, times_arr = parse_timestamps_csv(str(args.timestamps_csv))
+    df_rfid = parse_rfid_csv(str(args.rfid_csv))
+    dd = load_tracklets_pickle(str(args.pickle))
 
     # 低频 tag 过滤（≤ 阈值）
     tag_counts_all = df_rfid["tag"].value_counts()
@@ -558,7 +585,7 @@ def main():
     }
 
     # 9) 写回 pickle + Tag 分配（一次完成）
-    orig_path = Path(PICKLE_PATH)
+    orig_path = Path(args.pickle)
     backup_path = orig_path.with_name(orig_path.name + ".bak")
     tmp_path = orig_path.with_name(orig_path.name + ".tmp")
 

@@ -7,6 +7,8 @@
 ```
 project/
 ├── utils.py                      # 核心工具函数库
+├── convert_detection2tracklets.py # 检测结果转 tracklet 脚本
+├── match_rfid_to_tracklets.py    # RFID 匹配脚本
 ├── reconstruct_from_pickle.py    # 轨迹重建脚本
 ├── make_video.py                 # 视频可视化脚本
 ├── roi_definitions.json          # ROI区域定义文件
@@ -48,20 +50,28 @@ project/
 
 ## 使用方法
 
-### 1. 轨迹重建
+### 1. 检测结果转 tracklet
 ```bash
-# 修改 reconstruct_from_pickle.py 中的路径配置
-python reconstruct_from_pickle.py
+python convert_detection2tracklets.py --config config.yaml --video-input demo.mp4 --destfolder ./tracks/
+```
+
+### 2. RFID 匹配
+```bash
+python match_rfid_to_tracklets.py --pickle tracklets.pickle --rfid-csv rfid.csv --centers-txt readers_centers.txt --timestamps-csv timestamps.csv
+```
+
+### 3. 轨迹重建
+```bash
+python reconstruct_from_pickle.py --pickle-in tracklets.pickle --out-subdir CAP15
 ```
 
 输出文件：
 - 更新后的pickle文件（包含chain_tag和chain_id）
 - `chain_segments.csv`：链段详细信息
 
-### 2. 视频生成
+### 4. 视频生成
 ```bash
-# 修改 make_video.py 中的路径配置
-python make_video.py
+python make_video.py --video demo.mp4 --pickle tracklets.pickle --output-video rfid_tracklets_overlay.mp4
 ```
 
 输出文件：

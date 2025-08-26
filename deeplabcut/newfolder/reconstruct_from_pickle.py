@@ -15,6 +15,7 @@ from __future__ import annotations
 from pathlib import Path
 from collections import defaultdict
 from typing import Dict, Tuple, List, Any
+import argparse
 import time
 import numpy as np
 import pandas as pd
@@ -25,10 +26,9 @@ from utils import (
 )
 
 # ================== 配置参数 ==================
-# 输入输出路径
-PICKLE_IN  = "/ssd01/user_acc_data/oppa/deeplabcut/projects/MiceTrackerFor20-Oppa-2024-12-08/analyze_videos/shuffle3/demo1/velocity_gating/demoDLC_HrnetW32_MiceTrackerFor20Dec8shuffle3_detector_best-250_snapshot_best-190_el.pickle"
-PICKLE_OUT = None                # None=覆盖输入；或给出新路径
-OUT_SUBDIR = "CAP15"             # 输出到输入pickle同目录下的子目录；设 None 则不用子目录
+# 输入输出路径默认值
+PICKLE_IN_DEFAULT = Path.cwd() / "tracklets.pickle"
+OUT_SUBDIR_DEFAULT = "CAP15"
 
 # 相机与门控
 FPS        = 30.0                # 帧/秒
@@ -53,6 +53,33 @@ STOP_NEAR_ANCHOR = True
 RESET_PREVIOUS   = True          # 运行前清理旧的 chain_* 字段
 LOG_RUN_METADATA = True          # 记录本次运行参数（安全写法）
 
+
+# ================== 参数解析 ==================
+def parse_args():
+    parser = argparse.ArgumentParser(
+        description="Reconstruct tracklets using RFID anchors"
+    )
+    parser.add_argument(
+        "--pickle-in",
+        type=Path,
+        default=PICKLE_IN_DEFAULT,
+        help="Input tracklets pickle",
+    )
+    parser.add_argument(
+        "--pickle-out",
+        type=Path,
+        default=None,
+        help="Output pickle path (default: overwrite input)",
+    )
+    parser.add_argument(
+        "--out-subdir",
+        default=OUT_SUBDIR_DEFAULT,
+        help="Optional subdirectory under input directory",
+    )
+    args = parser.parse_args()
+    if not args.pickle_in.is_file():
+        parser.error(f"Input pickle not found: {args.pickle_in}")
+    return args
 
 # ================== 工具函数 ==================
 def _euclid(a, b) -> float:
@@ -409,19 +436,20 @@ def reconstruct_by_timespeed_gate(dd: Dict):
 
 # ================== 运行入口 ==================
 def main():
-    p_in = Path(PICKLE_IN)
-    if OUT_SUBDIR:
-        out_dir = p_in.parent / OUT_SUBDIR
+    args = parse_args()
+    p_in = args.pickle_in
+    if args.out_subdir:
+        out_dir = p_in.parent / args.out_subdir
         out_dir.mkdir(parents=True, exist_ok=True)
         p_out = out_dir / p_in.name  # 保留原文件名
     else:
-        p_out = p_in if PICKLE_OUT is None else Path(PICKLE_OUT)
+        p_out = p_in if args.pickle_out is None else args.pickle_out
 
     if not p_in.exists():
         print(f"错误：输入文件不存在: {p_in}")
         return
     if str(p_in).endswith(".json"):
-        print(f"错误：PICKLE_IN 指向 JSON 而非 .pickle：{p_in}")
+        print(f"错误：pickle_in 指向 JSON 而非 .pickle：{p_in}")
         return
     if FPS <= 0 or PX_PER_CM <= 0 or V_GATE_CMS <= 0:
         print("错误：请正确设置 FPS、PX_PER_CM、V_GATE_CMS（均需>0）")

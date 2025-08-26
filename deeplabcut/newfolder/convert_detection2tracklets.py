@@ -7,45 +7,81 @@
 """
 
 from pathlib import Path
+import argparse
 import deeplabcut as dlc
 from deeplabcut.utils import auxiliaryfunctions as aux
 
-# ===========================
-# 硬编码参数（按需修改）
-# ===========================
-CONFIG_PATH  = "/ssd01/user_acc_data/oppa/deeplabcut/projects/MiceTrackerFor20-Oppa-2024-12-08/config.yaml"
-TRACK_METHOD = "ellipse"   # "ellipse" / "skeleton" / "box"
-SHUFFLE      = 3
-DESTFOLDER   = "/ssd01/user_acc_data/oppa/deeplabcut/projects/MiceTrackerFor20-Oppa-2024-12-08/analyze_videos/shuffle3/demo1/"
-VIDEO_INPUT  = "/ssd01/user_acc_data/oppa/deeplabcut/videos/test/demo.mp4"
-VIDEOTYPE    = "mp4"       # 目录模式生效；文件模式无所谓
-# ===========================
 
-
-def collect_videos(input_path: str):
+def collect_videos(input_path: str, videotype: str | None):
     p = Path(input_path)
     if p.is_dir():
-        if VIDEOTYPE:
-            vids = sorted(str(x) for x in p.glob(f"*.{VIDEOTYPE.lstrip('.')}"))
+        if videotype:
+            vids = sorted(str(x) for x in p.glob(f"*.{videotype.lstrip('.')}") )
         else:
             exts = (".mp4", ".avi", ".mov", ".mpeg", ".mkv")
             vids = sorted(str(x) for x in p.iterdir() if x.suffix.lower() in exts)
     else:
         vids = [str(p)]
     if not vids:
-        raise FileNotFoundError(f"在 {input_path} 下未找到视频（后缀：{VIDEOTYPE or '常见扩展'}）")
+        raise FileNotFoundError(
+            f"在 {input_path} 下未找到视频（后缀：{videotype or '常见扩展'}）"
+        )
     return vids
 
 
+def parse_args():
+    parser = argparse.ArgumentParser(
+        description="Convert DLC detections to tracklets"
+    )
+    parser.add_argument(
+        "--config",
+        default=Path.cwd() / "config.yaml",
+        help="Path to DLC project config.yaml",
+    )
+    parser.add_argument(
+        "--track-method",
+        default="ellipse",
+        choices=["ellipse", "skeleton", "box"],
+        help="Tracking method",
+    )
+    parser.add_argument(
+        "--shuffle", type=int, default=3, help="Training shuffle index"
+    )
+    parser.add_argument(
+        "--destfolder",
+        default=None,
+        help="Destination folder for outputs",
+    )
+    parser.add_argument(
+        "--video-input",
+        default=str(Path.cwd()),
+        help="Video file or directory",
+    )
+    parser.add_argument(
+        "--videotype",
+        default=None,
+        help="Restrict directory search to this extension",
+    )
+    args = parser.parse_args()
+    config_path = Path(args.config)
+    if not config_path.is_file():
+        parser.error(f"Config file not found: {config_path}")
+    return args, config_path
+
+
 def main():
-    videos = collect_videos(VIDEO_INPUT)
-    print(f"[INFO] config: {CONFIG_PATH}")
-    print(f"[INFO] videos: {len(videos)} 个（track_method={TRACK_METHOD}）")
-    print(f"[INFO] destfolder: {DESTFOLDER or '(视频目录)'}")
+    args, config_path = parse_args()
+    videos = collect_videos(args.video_input, args.videotype)
+    destfolder = Path(args.destfolder) if args.destfolder else None
+    if destfolder:
+        destfolder.mkdir(parents=True, exist_ok=True)
+    print(f"[INFO] config: {config_path}")
+    print(f"[INFO] videos: {len(videos)} 个（track_method={args.track_method}）")
+    print(f"[INFO] destfolder: {destfolder or '(视频目录)'}")
 
     # 1) 优先使用项目 config.yaml 中的 inference_cfg / inferencecfg
     try:
-        cfg = aux.read_config(CONFIG_PATH)
+        cfg = aux.read_config(str(config_path))
         base_inferencecfg = (cfg.get("inference_cfg") or cfg.get("inferencecfg") or {}).copy()
     except Exception:
         base_inferencecfg = {}
@@ -62,13 +98,13 @@ def main():
 
     # 3) 调用 DLC：不再强行覆盖任何 tracking 阈值，保持默认
     dlc.convert_detections2tracklets(
-        config=CONFIG_PATH,
+        config=str(config_path),
         videos=videos,
-        videotype=VIDEOTYPE,
-        shuffle=SHUFFLE,
-        track_method=TRACK_METHOD,
-        destfolder=DESTFOLDER,
-        inferencecfg=base_inferencecfg
+        videotype=args.videotype,
+        shuffle=args.shuffle,
+        track_method=args.track_method,
+        destfolder=str(destfolder) if destfolder else None,
+        inferencecfg=base_inferencecfg,
     )
 
     print("\n[OK] 完成。请在对应输出目录查看 *.pickle（tracklets）文件。")
