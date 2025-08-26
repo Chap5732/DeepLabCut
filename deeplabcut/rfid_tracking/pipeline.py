@@ -72,6 +72,13 @@ def run_pipeline(
     )
 
     # 2) convert detections to tracklets
+    valid_methods = {"ellipse", "skeleton", "box"}
+    if track_method not in valid_methods:
+        raise ValueError(
+            f"Unsupported track_method '{track_method}'. Supported methods are: "
+            f"{', '.join(sorted(valid_methods))}."
+        )
+
     convert_detections2tracklets(
         config=config_path,
         videos=[str(video_path)],
