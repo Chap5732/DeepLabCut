@@ -56,13 +56,32 @@ def run_pipeline(
     from deeplabcut.utils import auxiliaryfunctions as aux
     from deeplabcut.utils.auxiliaryfunctions import get_scorer_name
 
+    config_path = Path(config_path)
+    if not config_path.exists():
+        raise FileNotFoundError(f"Config file not found: {config_path}")
+
     video_path = Path(video_path)
+    if not video_path.exists():
+        raise FileNotFoundError(f"Video file not found: {video_path}")
+
+    rfid_csv = Path(rfid_csv)
+    if not rfid_csv.exists():
+        raise FileNotFoundError(f"RFID CSV file not found: {rfid_csv}")
+
+    centers_txt = Path(centers_txt)
+    if not centers_txt.exists():
+        raise FileNotFoundError(f"Reader centers file not found: {centers_txt}")
+
+    ts_csv = Path(ts_csv)
+    if not ts_csv.exists():
+        raise FileNotFoundError(f"Timestamps CSV file not found: {ts_csv}")
+
     dest = Path(destfolder) if destfolder else video_path.parent
     videotype = video_path.suffix.lstrip(".")
 
     # 1) run inference to create assemblies without auto tracking
     analyze_videos(
-        config_path,
+        str(config_path),
         [str(video_path)],
         videotype=videotype,
         shuffle=shuffle,
@@ -80,7 +99,7 @@ def run_pipeline(
         )
 
     convert_detections2tracklets(
-        config=config_path,
+        config=str(config_path),
         videos=[str(video_path)],
         videotype=videotype,
         shuffle=shuffle,
@@ -99,9 +118,9 @@ def run_pipeline(
     # 3) match RFID events to tracklets
     match_rfid_to_tracklets(
         pickle_path=str(track_pickle),
-        rfid_csv=rfid_csv,
-        centers_txt=centers_txt,
-        ts_csv=ts_csv,
+        rfid_csv=str(rfid_csv),
+        centers_txt=str(centers_txt),
+        ts_csv=str(ts_csv),
         out_dir=None,
     )
 
@@ -121,7 +140,7 @@ def run_pipeline(
     make_video(
         video_path=str(video_path),
         pickle_path=str(track_pickle),
-        centers_txt=centers_txt,
+        centers_txt=str(centers_txt),
         output_video=str(out_vid),
     )
 
