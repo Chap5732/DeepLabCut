@@ -10,12 +10,19 @@
 
 from __future__ import annotations
 
+if __name__ == "__main__" and __package__ is None:
+    import sys
+    from pathlib import Path
+
+    sys.path.append(str(Path(__file__).resolve().parents[1]))
+    __package__ = "rfid_pipeline"
+
 from collections import defaultdict, deque
 from pathlib import Path
 
 import cv2
 import numpy as np
-from utils import (
+from .utils import (
     body_center_from_arr,
     centers_to_reader_positions_column_major,
     color_for_id,

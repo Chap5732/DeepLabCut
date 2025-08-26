@@ -12,6 +12,14 @@
 """
 
 from __future__ import annotations
+
+if __name__ == "__main__" and __package__ is None:
+    import sys
+    from pathlib import Path
+
+    sys.path.append(str(Path(__file__).resolve().parents[1]))
+    __package__ = "rfid_pipeline"
+
 from pathlib import Path
 from collections import defaultdict
 from typing import Dict, Tuple, List, Any
@@ -19,9 +27,12 @@ import time
 import numpy as np
 import pandas as pd
 
-from utils import (
-    load_tracklets_pickle, save_pickle_safely, frame_idx_from_key,
-    find_mouse_center_index, body_center_from_arr
+from .utils import (
+    load_tracklets_pickle,
+    save_pickle_safely,
+    frame_idx_from_key,
+    find_mouse_center_index,
+    body_center_from_arr,
 )
 
 # ================== 配置参数 ==================
