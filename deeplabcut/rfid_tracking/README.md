@@ -40,6 +40,7 @@ project/
 - RFID事件：标签检测事件提示
 - 身份链：重建后的完整轨迹
 - 读卡器：RFID读卡器位置标记
+  - 默认绿圈显示；若当帧某读卡器读取到标签，其圆圈将高亮为黄色
 - ROI区域：感兴趣区域边界
 
 ### 3. 工具函数库 (`utils.py`)
@@ -50,6 +51,28 @@ project/
 - **几何计算**：ROI命中测试、距离计算
 
 ## 使用方法
+
+### 一键全流程分析
+```python
+from deeplabcut import run_rfid_pipeline
+
+run_rfid_pipeline(
+    config_path="path/to/config.yaml",
+    video_path="path/to/video.mp4",
+    rfid_csv="path/to/rfid.csv",
+    centers_txt="path/to/readers_centers.txt",
+    ts_csv="path/to/timestamps.csv",
+    destfolder="path/to/output"  # 可选
+)
+```
+
+该函数依次调用：
+
+1. `deeplabcut.analyze_videos(..., auto_track=False)`
+2. `deeplabcut.convert_detections2tracklets`
+3. `deeplabcut.match_rfid_to_tracklets`
+4. `deeplabcut.reconstruct_from_pickle`
+5. `deeplabcut.make_video`
 
 ### 0. 检测结果转 tracklets
 ```bash
@@ -114,7 +137,7 @@ python make_video.py
 {
   "Entrance1": [
     [35, 444],
-    [162, 444], 
+    [162, 444],
     [162, 634],
     [35, 634]
   ]
@@ -141,7 +164,7 @@ python make_video.py
 ## 依赖库
 
 - numpy
-- pandas  
+- pandas
 - opencv-python
 - pathlib (标准库)
 - json (标准库)
