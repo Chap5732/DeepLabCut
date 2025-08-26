@@ -17,53 +17,66 @@ import json
 import pickle
 from pathlib import Path
 from collections import defaultdict
+import argparse
 
 import numpy as np
 import pandas as pd
 
+from . import config
+
 # ==========================
-# ====== 用户配置区 =========
+# ====== 配置参数 ==========
 # ==========================
 
-# ---- 路径 ----
-PICKLE_PATH = "/ssd01/user_acc_data/oppa/deeplabcut/projects/MiceTrackerFor20-Oppa-2024-12-08/analyze_videos/shuffle3/demo1/velocity_gating/demoDLC_HrnetW32_MiceTrackerFor20Dec8shuffle3_detector_best-250_snapshot_best-190_el.pickle"
-RFID_CSV    = "/ssd01/user_acc_data/oppa/analysis/data/jc0813/rfid_data_20250813_055827.csv"
-CENTERS_TXT = "/ssd01/user_acc_data/oppa/analysis/data/jc0813/readers_centers.txt"
-TS_CSV      = "/ssd01/user_acc_data/oppa/analysis/data/jc0813/record_20250813_053913_timestamps.csv"
-OUT_DIR     = None  # None -> 与 pickle 同目录创建 rfid_match_outputs/
 
-# ---- 阵列/网格配置（很关键）----
-N_ROWS  = 12           # 行数
-N_COLS  = 12           # 列数
-ID_BASE = 0            # RFID CSV 中的 id 是否从 0 开始（若从 1 开始则设为 1）
-Y_TOP_TO_BOTTOM = True # True: 画面上方 y 小、下方 y 大；若相反改 False
+def refresh_from_config() -> None:
+    """Sync module-level variables from ``config``."""
+    global PICKLE_PATH, RFID_CSV, CENTERS_TXT, TS_CSV, OUT_DIR
+    global N_ROWS, N_COLS, ID_BASE, Y_TOP_TO_BOTTOM
+    global PCUTOFF, RFID_FRAME_RANGE, COIL_DIAMETER_PX, HIT_MARGIN, HIT_RADIUS_PX
+    global UNIQUE_NEIGHBOR_ONLY, AMBIG_MARGIN_PX
+    global LOW_FREQ_TAG_MIN_COUNT, MIN_VALID_FRAMES_PER_TK
+    global TAG_CONFIDENCE_THRESHOLD, TAG_MIN_READS, TAG_DOMINANT_RATIO
+    global LOW_READS_HIGH_PURITY_ASSIGN, LOW_READS_PURITY_THRESHOLD
+    global USE_FRAME_STABILITY_CHECK, BURST_GAP_FRAMES, MIN_BURSTS_IF_LOWHITS, LOWHITS_THRESHOLD
 
-# ---- 几何与匹配门槛 ----
-PCUTOFF = 0.35            # mouse center / 回退质心 的置信度阈值
-RFID_FRAME_RANGE = 10     # 每帧纳入竞争的时间窗口（±range//2）
-COIL_DIAMETER_PX = 170.0
-HIT_MARGIN       = 1.00
-HIT_RADIUS_PX    = (COIL_DIAMETER_PX / 2.0) * HIT_MARGIN  # 命中半径（像素）
+    PICKLE_PATH = config.MRT_PICKLE_PATH
+    RFID_CSV = config.MRT_RFID_CSV
+    CENTERS_TXT = config.MRT_CENTERS_TXT
+    TS_CSV = config.MRT_TS_CSV
+    OUT_DIR = config.MRT_OUT_DIR
 
-UNIQUE_NEIGHBOR_ONLY = True   # 是否要求最近邻“足够唯一”
-AMBIG_MARGIN_PX      = 75.0   # 最近与次近差距 < 此值 → 视为不唯一（丢弃事件）
+    N_ROWS = config.MRT_N_ROWS
+    N_COLS = config.MRT_N_COLS
+    ID_BASE = config.MRT_ID_BASE
+    Y_TOP_TO_BOTTOM = config.MRT_Y_TOP_TO_BOTTOM
 
-LOW_FREQ_TAG_MIN_COUNT = 2    # 过滤：全局出现次数 ≤ 此阈值 的 tag 忽略
-MIN_VALID_FRAMES_PER_TK = 1   # tracklet 至少有这么多有效帧才参与匹配
+    PCUTOFF = config.MRT_PCUTOFF
+    RFID_FRAME_RANGE = config.MRT_RFID_FRAME_RANGE
+    COIL_DIAMETER_PX = config.MRT_COIL_DIAMETER_PX
+    HIT_MARGIN = config.MRT_HIT_MARGIN
+    HIT_RADIUS_PX = config.MRT_HIT_RADIUS_PX
 
-# ---- Tag 分配阈值（保守）----
-TAG_CONFIDENCE_THRESHOLD = 0.70   # 主导占比 ≥ 70%
-TAG_MIN_READS            = 20     # 总读数 ≥ 20
-TAG_DOMINANT_RATIO       = 3.0    # 第一名/第二名 ≥ 3
-# 当总读数 < TAG_MIN_READS 且top占比≥该值时，仍然指派
-LOW_READS_HIGH_PURITY_ASSIGN = True
-LOW_READS_PURITY_THRESHOLD   = 0.90
+    UNIQUE_NEIGHBOR_ONLY = config.MRT_UNIQUE_NEIGHBOR_ONLY
+    AMBIG_MARGIN_PX = config.MRT_AMBIG_MARGIN_PX
 
-# ---- 逐帧稳健性（可关）----
-USE_FRAME_STABILITY_CHECK = False   # 打开逐帧稳健性判据
-BURST_GAP_FRAMES          = 150    # ~5秒@30fps，命中间隔≥此值计作新波段
-MIN_BURSTS_IF_LOWHITS     = 2      # 当总读数 < 200 时，要求 ≥2 个波段
-LOWHITS_THRESHOLD         = 200
+    LOW_FREQ_TAG_MIN_COUNT = config.MRT_LOW_FREQ_TAG_MIN_COUNT
+    MIN_VALID_FRAMES_PER_TK = config.MRT_MIN_VALID_FRAMES_PER_TK
+
+    TAG_CONFIDENCE_THRESHOLD = config.MRT_TAG_CONFIDENCE_THRESHOLD
+    TAG_MIN_READS = config.MRT_TAG_MIN_READS
+    TAG_DOMINANT_RATIO = config.MRT_TAG_DOMINANT_RATIO
+    LOW_READS_HIGH_PURITY_ASSIGN = config.MRT_LOW_READS_HIGH_PURITY_ASSIGN
+    LOW_READS_PURITY_THRESHOLD = config.MRT_LOW_READS_PURITY_THRESHOLD
+
+    USE_FRAME_STABILITY_CHECK = config.MRT_USE_FRAME_STABILITY_CHECK
+    BURST_GAP_FRAMES = config.MRT_BURST_GAP_FRAMES
+    MIN_BURSTS_IF_LOWHITS = config.MRT_MIN_BURSTS_IF_LOWHITS
+    LOWHITS_THRESHOLD = config.MRT_LOWHITS_THRESHOLD
+
+
+# Load defaults
+refresh_from_config()
 
 # ==========================
 # ====== 工具函数 ===========
@@ -365,6 +378,14 @@ def assign_tag_for_one_tracklet(
 # ==========================
 
 def main():
+    parser = argparse.ArgumentParser(description="Match RFID events to tracklets")
+    parser.add_argument("--config", help="YAML file overriding MRT_* defaults", default=None)
+    args = parser.parse_args()
+
+    if args.config:
+        config.load_mrt_config(args.config)
+        refresh_from_config()
+
     out_dir = ensure_out_dir(PICKLE_PATH)
 
     # 1) 加载并按坐标重排为行优先网格
