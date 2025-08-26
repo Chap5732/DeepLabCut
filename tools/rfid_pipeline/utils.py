@@ -4,6 +4,7 @@
 import json
 import math
 import re
+import hashlib
 import pickle
 from pathlib import Path
 from typing import List, Tuple, Dict, Any, Optional
@@ -92,7 +93,8 @@ def body_center_from_arr(arr: np.ndarray, mc_idx: Optional[int], pcutoff: float)
 
 def color_for_id(any_id) -> Tuple[int, int, int]:
     """为ID生成BGR颜色"""
-    h = abs(hash(str(any_id))) % 360
+    digest = hashlib.md5(str(any_id).encode("utf-8")).hexdigest()
+    h = int(digest, 16) % 360
     s, v = 0.8, 1.0
     c = v * s
     x = c * (1 - abs((h / 60) % 2 - 1))
