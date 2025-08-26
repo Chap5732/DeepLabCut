@@ -13,11 +13,11 @@ from pathlib import Path
 from collections import defaultdict, deque
 import cv2
 import numpy as np
-from utils import (
+from .utils import (
     load_tracklets_pickle, frame_idx_from_key, find_mouse_center_index,
     body_center_from_arr, color_for_id, parse_centers,
     centers_to_reader_positions_column_major, draw_readers_on_frame,
-    load_rois, draw_rois
+    load_rois, draw_rois,
 )
 
 # ================== 配置参数 ==================
