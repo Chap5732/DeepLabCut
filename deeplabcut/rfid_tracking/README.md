@@ -51,6 +51,28 @@ project/
 
 ## 使用方法
 
+### 一键全流程分析
+```python
+from deeplabcut import run_rfid_pipeline
+
+run_rfid_pipeline(
+    config_path="path/to/config.yaml",
+    video_path="path/to/video.mp4",
+    rfid_csv="path/to/rfid.csv",
+    centers_txt="path/to/readers_centers.txt",
+    ts_csv="path/to/timestamps.csv",
+    destfolder="path/to/output"  # 可选
+)
+```
+
+该函数依次调用：
+
+1. `deeplabcut.analyze_videos(..., auto_track=False)`
+2. `deeplabcut.convert_detections2tracklets`
+3. `deeplabcut.match_rfid_to_tracklets`
+4. `deeplabcut.reconstruct_from_pickle`
+5. `deeplabcut.make_video`
+
 ### 0. 检测结果转 tracklets
 ```bash
 # 如需修改默认参数，先编辑 convert_detection2tracklets_config.yaml
@@ -114,7 +136,7 @@ python make_video.py
 {
   "Entrance1": [
     [35, 444],
-    [162, 444], 
+    [162, 444],
     [162, 634],
     [35, 634]
   ]
@@ -141,7 +163,7 @@ python make_video.py
 ## 依赖库
 
 - numpy
-- pandas  
+- pandas
 - opencv-python
 - pathlib (标准库)
 - json (标准库)
