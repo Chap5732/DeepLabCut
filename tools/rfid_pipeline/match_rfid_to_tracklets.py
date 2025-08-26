@@ -25,6 +25,7 @@ import json
 import pickle
 from pathlib import Path
 from collections import defaultdict
+import argparse
 
 import numpy as np
 import pandas as pd
@@ -36,7 +37,7 @@ from .utils import (
 )
 
 # ==========================
-# ====== 用户配置区 =========
+# ====== 默认参数 ==========
 # ==========================
 
 # ---- 路径 ----
@@ -653,4 +654,61 @@ def main():
     print(f"  pickle 已更新（backup: {backup_path}）")
 
 if __name__ == "__main__":
+    parser = argparse.ArgumentParser(description="Match RFID events to tracklets")
+    parser.add_argument("--pickle-path", default=PICKLE_PATH, help="tracklets pickle 路径")
+    parser.add_argument("--rfid-csv", default=RFID_CSV, help="RFID 读数 CSV")
+    parser.add_argument("--centers-txt", default=CENTERS_TXT, help="读卡器坐标文件")
+    parser.add_argument("--ts-csv", default=TS_CSV, help="时间戳 CSV")
+    parser.add_argument("--out-dir", default=OUT_DIR, help="输出目录")
+    parser.add_argument("--n-rows", type=int, default=N_ROWS, help="读卡器行数")
+    parser.add_argument("--n-cols", type=int, default=N_COLS, help="读卡器列数")
+    parser.add_argument("--id-base", type=int, default=ID_BASE, help="RFID id 起始值")
+    parser.add_argument("--y-top-to-bottom", type=int, default=int(Y_TOP_TO_BOTTOM), help="y 方向是否自上而下 (1/0)")
+    parser.add_argument("--pcutoff", type=float, default=PCUTOFF, help="置信度阈值")
+    parser.add_argument("--rfid-frame-range", type=int, default=RFID_FRAME_RANGE, help="RFID 时间窗口")
+    parser.add_argument("--coil-diameter-px", type=float, default=COIL_DIAMETER_PX, help="线圈直径像素")
+    parser.add_argument("--hit-margin", type=float, default=HIT_MARGIN, help="命中半径倍率")
+    parser.add_argument("--unique-neighbor-only", type=int, default=int(UNIQUE_NEIGHBOR_ONLY), help="是否要求唯一最近邻(1/0)")
+    parser.add_argument("--ambig-margin-px", type=float, default=AMBIG_MARGIN_PX, help="模糊距离阈值")
+    parser.add_argument("--low-freq-tag-min-count", type=int, default=LOW_FREQ_TAG_MIN_COUNT, help="低频tag过滤阈值")
+    parser.add_argument("--min-valid-frames-per-tk", type=int, default=MIN_VALID_FRAMES_PER_TK, help="tracklet最少有效帧")
+    parser.add_argument("--tag-confidence-threshold", type=float, default=TAG_CONFIDENCE_THRESHOLD, help="标签占比阈值")
+    parser.add_argument("--tag-min-reads", type=int, default=TAG_MIN_READS, help="标签最少读数")
+    parser.add_argument("--tag-dominant-ratio", type=float, default=TAG_DOMINANT_RATIO, help="一二名占比")
+    parser.add_argument("--low-reads-high-purity-assign", type=int, default=int(LOW_READS_HIGH_PURITY_ASSIGN), help="低读数高纯度仍指派(1/0)")
+    parser.add_argument("--low-reads-purity-threshold", type=float, default=LOW_READS_PURITY_THRESHOLD, help="低读数纯度阈值")
+    parser.add_argument("--use-frame-stability-check", type=int, default=int(USE_FRAME_STABILITY_CHECK), help="逐帧稳健性检查(1/0)")
+    parser.add_argument("--burst-gap-frames", type=int, default=BURST_GAP_FRAMES, help="波段间隔帧数")
+    parser.add_argument("--min-bursts-if-lowhits", type=int, default=MIN_BURSTS_IF_LOWHITS, help="低读数最少波段数")
+    parser.add_argument("--lowhits-threshold", type=int, default=LOWHITS_THRESHOLD, help="低读数阈值")
+    args = parser.parse_args()
+
+    PICKLE_PATH = args.pickle_path
+    RFID_CSV = args.rfid_csv
+    CENTERS_TXT = args.centers_txt
+    TS_CSV = args.ts_csv
+    OUT_DIR = args.out_dir
+    N_ROWS = args.n_rows
+    N_COLS = args.n_cols
+    ID_BASE = args.id_base
+    Y_TOP_TO_BOTTOM = bool(args.y_top_to_bottom)
+    PCUTOFF = args.pcutoff
+    RFID_FRAME_RANGE = args.rfid_frame_range
+    COIL_DIAMETER_PX = args.coil_diameter_px
+    HIT_MARGIN = args.hit_margin
+    HIT_RADIUS_PX = (COIL_DIAMETER_PX / 2.0) * HIT_MARGIN
+    UNIQUE_NEIGHBOR_ONLY = bool(args.unique_neighbor_only)
+    AMBIG_MARGIN_PX = args.ambig_margin_px
+    LOW_FREQ_TAG_MIN_COUNT = args.low_freq_tag_min_count
+    MIN_VALID_FRAMES_PER_TK = args.min_valid_frames_per_tk
+    TAG_CONFIDENCE_THRESHOLD = args.tag_confidence_threshold
+    TAG_MIN_READS = args.tag_min_reads
+    TAG_DOMINANT_RATIO = args.tag_dominant_ratio
+    LOW_READS_HIGH_PURITY_ASSIGN = bool(args.low_reads_high_purity_assign)
+    LOW_READS_PURITY_THRESHOLD = args.low_reads_purity_threshold
+    USE_FRAME_STABILITY_CHECK = bool(args.use_frame_stability_check)
+    BURST_GAP_FRAMES = args.burst_gap_frames
+    MIN_BURSTS_IF_LOWHITS = args.min_bursts_if_lowhits
+    LOWHITS_THRESHOLD = args.lowhits_threshold
+
     main()

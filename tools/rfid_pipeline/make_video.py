@@ -22,6 +22,7 @@ from pathlib import Path
 
 import cv2
 import numpy as np
+import argparse
 from .utils import (
     body_center_from_arr,
     centers_to_reader_positions_column_major,
@@ -480,4 +481,46 @@ def main():
 
 
 if __name__ == "__main__":
+    parser = argparse.ArgumentParser(description="Overlay tracklets and RFID events on video")
+    parser.add_argument("--video-path", default=VIDEO_PATH, help="原始视频路径")
+    parser.add_argument("--pickle-path", default=PICKLE_PATH, help="tracklets pickle 文件")
+    parser.add_argument("--output-video", default=OUTPUT_VIDEO, help="输出视频文件")
+    parser.add_argument("--draw-readers", type=int, default=int(DRAW_READERS), help="绘制读卡器(1/0)")
+    parser.add_argument("--centers-txt", default=CENTERS_TXT, help="读卡器坐标文件")
+    parser.add_argument("--draw-rois", type=int, default=int(DRAW_ROIS), help="绘制ROI(1/0)")
+    parser.add_argument("--roi-file", default=ROI_FILE, help="ROI定义文件")
+    parser.add_argument("--pcutoff", type=float, default=PCUTOFF, help="置信度阈值")
+    parser.add_argument("--trail-len", type=int, default=TRAIL_LEN, help="轨迹长度")
+    parser.add_argument("--tag-hold-frames", type=int, default=TAG_HOLD_FRAMES, help="RFID标签显示帧数")
+    parser.add_argument("--show-chain", type=int, default=int(SHOW_CHAIN), help="显示身份链(1/0)")
+    parser.add_argument("--chain-fallback-id", type=int, default=int(CHAIN_FALLBACK_ID), help="使用chain_id回退(1/0)")
+    parser.add_argument("--chain-trail-len", type=int, default=CHAIN_TRAIL_LEN)
+    parser.add_argument("--chain-line-thick", type=int, default=CHAIN_LINE_THICK)
+    parser.add_argument("--chain-point-r", type=int, default=CHAIN_POINT_R)
+    parser.add_argument("--draw-legend", type=int, default=int(DRAW_LEGEND), help="绘制图例(1/0)")
+    parser.add_argument("--legend-cols", type=int, default=LEGEND_COLS)
+    parser.add_argument("--legend-pos", nargs=2, type=int, default=LEGEND_POS)
+    parser.add_argument("--max-frames", type=int, default=MAX_FRAMES)
+    args = parser.parse_args()
+
+    VIDEO_PATH = args.video_path
+    PICKLE_PATH = args.pickle_path
+    OUTPUT_VIDEO = args.output_video
+    DRAW_READERS = bool(args.draw_readers)
+    CENTERS_TXT = args.centers_txt
+    DRAW_ROIS = bool(args.draw_rois)
+    ROI_FILE = args.roi_file
+    PCUTOFF = args.pcutoff
+    TRAIL_LEN = args.trail_len
+    TAG_HOLD_FRAMES = args.tag_hold_frames
+    SHOW_CHAIN = bool(args.show_chain)
+    CHAIN_FALLBACK_ID = bool(args.chain_fallback_id)
+    CHAIN_TRAIL_LEN = args.chain_trail_len
+    CHAIN_LINE_THICK = args.chain_line_thick
+    CHAIN_POINT_R = args.chain_point_r
+    DRAW_LEGEND = bool(args.draw_legend)
+    LEGEND_COLS = args.legend_cols
+    LEGEND_POS = tuple(args.legend_pos)
+    MAX_FRAMES = args.max_frames
+
     main()

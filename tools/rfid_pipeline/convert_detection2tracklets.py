@@ -7,11 +7,12 @@
 """
 
 from pathlib import Path
+import argparse
 import deeplabcut as dlc
 from deeplabcut.utils import auxiliaryfunctions as aux
 
 # ===========================
-# 硬编码参数（按需修改）
+# 默认参数（可通过命令行覆盖）
 # ===========================
 CONFIG_PATH  = "/ssd01/user_acc_data/oppa/deeplabcut/projects/MiceTrackerFor20-Oppa-2024-12-08/config.yaml"
 TRACK_METHOD = "ellipse"   # "ellipse" / "skeleton" / "box"
@@ -75,4 +76,20 @@ def main():
 
 
 if __name__ == "__main__":
+    parser = argparse.ArgumentParser(description="Convert DLC detections to tracklets")
+    parser.add_argument("--config", default=CONFIG_PATH, help="路径到 config.yaml")
+    parser.add_argument("--track-method", default=TRACK_METHOD, help="tracking 方法")
+    parser.add_argument("--shuffle", type=int, default=SHUFFLE, help="shuffle 编号")
+    parser.add_argument("--destfolder", default=DESTFOLDER, help="输出目录")
+    parser.add_argument("--video-input", default=VIDEO_INPUT, help="视频文件或目录")
+    parser.add_argument("--videotype", default=VIDEOTYPE, help="目录模式下的视频后缀")
+    args = parser.parse_args()
+
+    CONFIG_PATH = args.config
+    TRACK_METHOD = args.track_method
+    SHUFFLE = args.shuffle
+    DESTFOLDER = args.destfolder
+    VIDEO_INPUT = args.video_input
+    VIDEOTYPE = args.videotype
+
     main()

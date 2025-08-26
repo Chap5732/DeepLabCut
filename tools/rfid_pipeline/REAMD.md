@@ -50,8 +50,11 @@ project/
 
 ### 1. 轨迹重建
 ```bash
-# 修改 reconstruct_from_pickle.py 中的路径配置
-python reconstruct_from_pickle.py
+# 示例：指定输入/输出路径及关键参数
+python reconstruct_from_pickle.py \
+  --pickle-in path/to/tracklets.pickle \
+  --out-subdir CAP15 \
+  --fps 30 --px-per-cm 14 --v-gate-cms 80
 ```
 
 输出文件：
@@ -60,8 +63,11 @@ python reconstruct_from_pickle.py
 
 ### 2. 视频生成
 ```bash
-# 修改 make_video.py 中的路径配置
-python make_video.py
+# 示例：生成带叠加信息的视频
+python make_video.py \
+  --video-path path/to/video.mp4 \
+  --pickle-path path/to/tracklets.pickle \
+  --output-video rfid_tracklets_overlay.mp4
 ```
 
 输出文件：

@@ -26,6 +26,7 @@ from typing import Dict, Tuple, List, Any
 import time
 import numpy as np
 import pandas as pd
+import argparse
 
 from .utils import (
     load_tracklets_pickle,
@@ -35,7 +36,7 @@ from .utils import (
     body_center_from_arr,
 )
 
-# ================== 配置参数 ==================
+# ================== 默认参数 ==================
 # 输入输出路径
 PICKLE_IN  = "/ssd01/user_acc_data/oppa/deeplabcut/projects/MiceTrackerFor20-Oppa-2024-12-08/analyze_videos/shuffle3/demo1/velocity_gating/demoDLC_HrnetW32_MiceTrackerFor20Dec8shuffle3_detector_best-250_snapshot_best-190_el.pickle"
 PICKLE_OUT = None                # None=覆盖输入；或给出新路径
@@ -489,4 +490,40 @@ def main():
     print(f"重建完成：共生成 {len(df_chains)} 条链段记录")
 
 if __name__ == "__main__":
+    parser = argparse.ArgumentParser(description="Reconstruct tracklets with RFID anchors")
+    parser.add_argument("--pickle-in", default=PICKLE_IN, help="输入的 tracklets pickle")
+    parser.add_argument("--pickle-out", default=PICKLE_OUT, help="输出 pickle 文件路径")
+    parser.add_argument("--out-subdir", default=OUT_SUBDIR, help="输出子目录")
+    parser.add_argument("--fps", type=float, default=FPS, help="帧率")
+    parser.add_argument("--px-per-cm", type=float, default=PX_PER_CM, help="像素/厘米")
+    parser.add_argument("--v-gate-cms", type=float, default=V_GATE_CMS, help="速度门控(cm/s)")
+    parser.add_argument("--pcutoff", type=float, default=PCUTOFF, help="置信度阈值")
+    parser.add_argument("--head-tail-sample", type=int, default=HEAD_TAIL_SAMPLE, help="头尾采样帧数")
+    parser.add_argument("--max-gap-frames", type=int, default=MAX_GAP_FRAMES, help="最大时间间隔")
+    parser.add_argument("--anchor-min-hits", type=int, default=ANCHOR_MIN_HITS, help="锚点最少命中次数")
+    parser.add_argument("--eps-gap", type=float, default=EPS_GAP, help="代价中 gap 权重")
+    parser.add_argument("--delta-px-cap", type=float, default=DELTA_PX_CAP, help="歧义冻结像素上限")
+    parser.add_argument("--delta-prop", type=float, default=DELTA_PROP, help="歧义冻结相对门槛")
+    parser.add_argument("--stop-near-anchor", type=int, default=int(STOP_NEAR_ANCHOR), help="近锚点止水(1/0)")
+    parser.add_argument("--reset-previous", type=int, default=int(RESET_PREVIOUS), help="运行前清理旧链(1/0)")
+    parser.add_argument("--log-run-metadata", type=int, default=int(LOG_RUN_METADATA), help="记录运行参数(1/0)")
+    args = parser.parse_args()
+
+    PICKLE_IN = args.pickle_in
+    PICKLE_OUT = args.pickle_out
+    OUT_SUBDIR = args.out_subdir
+    FPS = args.fps
+    PX_PER_CM = args.px_per_cm
+    V_GATE_CMS = args.v_gate_cms
+    PCUTOFF = args.pcutoff
+    HEAD_TAIL_SAMPLE = args.head_tail_sample
+    MAX_GAP_FRAMES = args.max_gap_frames
+    ANCHOR_MIN_HITS = args.anchor_min_hits
+    EPS_GAP = args.eps_gap
+    DELTA_PX_CAP = args.delta_px_cap
+    DELTA_PROP = args.delta_prop
+    STOP_NEAR_ANCHOR = bool(args.stop_near_anchor)
+    RESET_PREVIOUS = bool(args.reset_previous)
+    LOG_RUN_METADATA = bool(args.log_run_metadata)
+
     main()
