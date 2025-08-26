@@ -11,6 +11,14 @@ RFID（按坐标重排→行优先 id）→ tracklet 累计读数 + 保守/智�
 """
 
 from __future__ import annotations
+
+if __name__ == "__main__" and __package__ is None:
+    import sys
+    from pathlib import Path
+
+    sys.path.append(str(Path(__file__).resolve().parents[1]))
+    __package__ = "rfid_pipeline"
+
 import os
 import re
 import json
@@ -20,7 +28,7 @@ from collections import defaultdict
 
 import numpy as np
 import pandas as pd
-from utils import (
+from .utils import (
     load_tracklets_pickle,
     frame_idx_from_key,
     find_mouse_center_index,
