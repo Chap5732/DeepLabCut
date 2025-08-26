@@ -358,11 +358,10 @@ def draw_chain_legend(frame, chain_trail, pos=(20, 40), cols=2):
 # ================== 主函数 ==================
 def main():
     """主函数"""
-    # 检查文件是否存在
-    for pth, msg in [(VIDEO_PATH, "视频"), (PICKLE_PATH, "pickle")]:
-        if not Path(pth).exists():
-            print(f"错误：{msg}文件不存在: {pth}")
-            return
+    # 检查视频和 pickle 文件是否存在
+    for pth, desc in [(VIDEO_PATH, "video"), (PICKLE_PATH, "pickle")]:
+        if not Path(pth).is_file():
+            raise FileNotFoundError(f"{desc} file not found: {pth}")
 
     # 加载数据
     print("正在加载tracklet数据...")
@@ -387,19 +386,23 @@ def main():
 
     # 加载读卡器位置（可选）
     reader_positions = None
-    if DRAW_READERS and Path(CENTERS_TXT).exists():
+    if DRAW_READERS:
+        if not Path(CENTERS_TXT).is_file():
+            raise FileNotFoundError(f"centers_txt file not found: {CENTERS_TXT}")
         centers, meta = parse_centers(CENTERS_TXT)
         reader_positions = centers_to_reader_positions_column_major(centers, meta)
         print(f"读取到 {len(reader_positions)} 个读卡器位置")
 
     # 加载ROI（可选）
-    rois = (
-        load_rois(ROI_FILE)
-        if (DRAW_ROIS and ROI_FILE and Path(ROI_FILE).exists())
-        else []
-    )
-    if rois:
-        print(f"加载了 {len(rois)} 个ROI区域")
+    rois = []
+    if DRAW_ROIS:
+        if not ROI_FILE:
+            raise FileNotFoundError("ROI file path is not specified")
+        if not Path(ROI_FILE).is_file():
+            raise FileNotFoundError(f"ROI file not found: {ROI_FILE}")
+        rois = load_rois(ROI_FILE)
+        if rois:
+            print(f"加载了 {len(rois)} 个ROI区域")
 
     # 打开视频
     cap = cv2.VideoCapture(VIDEO_PATH)
