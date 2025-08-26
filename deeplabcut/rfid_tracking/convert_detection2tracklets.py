@@ -13,7 +13,12 @@ import click
 import deeplabcut as dlc
 from deeplabcut.utils import auxiliaryfunctions as aux
 
-DEFAULTS_PATH = Path(__file__).with_name("convert_detection2tracklets_config.yaml")
+try:  # 允许作为脚本或模块运行
+    from . import config
+except ImportError:  # pragma: no cover
+    import config
+
+DEFAULTS_PATH = config.CONVERT_DEFAULTS
 
 
 def collect_videos(input_path: str, videotype: Optional[str]):

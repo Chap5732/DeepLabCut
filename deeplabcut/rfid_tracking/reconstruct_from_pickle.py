@@ -22,34 +22,33 @@ import pandas as pd
 from .io import load_tracklets_pickle, save_pickle_safely
 from .dlc_tools import frame_idx_from_key, find_mouse_center_index, body_center_from_arr
 
+try:  # 允许作为脚本或模块运行
+    from . import config
+except ImportError:  # pragma: no cover
+    import config
+
 # ================== 配置参数 ==================
-# 输入输出路径
-PICKLE_IN  = "/ssd01/user_acc_data/oppa/deeplabcut/projects/MiceTrackerFor20-Oppa-2024-12-08/analyze_videos/shuffle3/demo1/velocity_gating/demoDLC_HrnetW32_MiceTrackerFor20Dec8shuffle3_detector_best-250_snapshot_best-190_el.pickle"
-PICKLE_OUT = None                # None=覆盖输入；或给出新路径
-OUT_SUBDIR = "CAP15"             # 输出到输入pickle同目录下的子目录；设 None 则不用子目录
+PICKLE_IN = config.PICKLE_IN
+PICKLE_OUT = config.PICKLE_OUT
+OUT_SUBDIR = config.OUT_SUBDIR
 
-# 相机与门控
-FPS        = 30.0                # 帧/秒
-PX_PER_CM  = 14.0                # 像素/厘米（相机标定）
-V_GATE_CMS = 80.0                # cm/s
+FPS = config.FPS
+PX_PER_CM = config.PX_PER_CM
+V_GATE_CMS = config.V_GATE_CMS
 
-# 重建参数
-PCUTOFF            = 0.35
-HEAD_TAIL_SAMPLE   = 5
-MAX_GAP_FRAMES     = 60
-ANCHOR_MIN_HITS    = 1
+PCUTOFF = config.PCUTOFF
+HEAD_TAIL_SAMPLE = config.HEAD_TAIL_SAMPLE
+MAX_GAP_FRAMES = config.MAX_GAP_FRAMES
+ANCHOR_MIN_HITS = config.ANCHOR_MIN_HITS
 
-# 同步推进裁决参数（只作用于冲突裁决，不改变门控本质）
-EPS_GAP       = 0.5              # cost = d + EPS_GAP * gap（设 0 可关闭）
-DELTA_PX_CAP  = 15.0             # 歧义冻结像素上限（代价差可接受阈值）
-DELTA_PROP    = 0.10             # 歧义冻结相对门槛（门控上限的 10%）
+EPS_GAP = config.EPS_GAP
+DELTA_PX_CAP = config.DELTA_PX_CAP
+DELTA_PROP = config.DELTA_PROP
 
-# 邻近锚点“堤坝止水”
-STOP_NEAR_ANCHOR = True
+STOP_NEAR_ANCHOR = config.STOP_NEAR_ANCHOR
 
-# 可重复运行支持
-RESET_PREVIOUS   = True          # 运行前清理旧的 chain_* 字段
-LOG_RUN_METADATA = True          # 记录本次运行参数（安全写法）
+RESET_PREVIOUS = config.RESET_PREVIOUS
+LOG_RUN_METADATA = config.LOG_RUN_METADATA
 
 
 # ================== 工具函数 ==================
