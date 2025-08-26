@@ -405,14 +405,19 @@ def reconstruct_by_timespeed_gate(dd: Dict):
 
 
 # ================== 运行入口 ==================
-def main():
-    p_in = Path(PICKLE_IN)
-    if OUT_SUBDIR:
-        out_dir = p_in.parent / OUT_SUBDIR
+def main(
+    *,
+    pickle_in: str | None = None,
+    pickle_out: str | None = None,
+    out_subdir: str | None = None,
+) -> None:
+    p_in = Path(pickle_in or PICKLE_IN)
+    out_subdir = out_subdir if out_subdir is not None else OUT_SUBDIR
+    p_out = p_in if pickle_out is None else Path(pickle_out)
+    if out_subdir:
+        out_dir = p_in.parent / out_subdir
         out_dir.mkdir(parents=True, exist_ok=True)
         p_out = out_dir / p_in.name  # 保留原文件名
-    else:
-        p_out = p_in if PICKLE_OUT is None else Path(PICKLE_OUT)
 
     if not p_in.exists():
         print(f"错误：输入文件不存在: {p_in}")

@@ -82,8 +82,8 @@ refresh_from_config()
 # ====== 工具函数 ===========
 # ==========================
 
-def ensure_out_dir(pickle_path: str) -> Path:
-    out = Path(OUT_DIR) if OUT_DIR else (Path(pickle_path).parent / "rfid_match_outputs")
+def ensure_out_dir(pickle_path: str, out_dir: str | None) -> Path:
+    out = Path(out_dir) if out_dir else (Path(pickle_path).parent / "rfid_match_outputs")
     out.mkdir(parents=True, exist_ok=True)
     return out
 
@@ -377,19 +377,29 @@ def assign_tag_for_one_tracklet(
 # ====== 主流程 =============
 # ==========================
 
-def main():
-    parser = argparse.ArgumentParser(description="Match RFID events to tracklets")
-    parser.add_argument("--config", help="YAML file overriding MRT_* defaults", default=None)
-    args = parser.parse_args()
+def main(
+    *,
+    pickle_path: str | None = None,
+    rfid_csv: str | None = None,
+    centers_txt: str | None = None,
+    ts_csv: str | None = None,
+    out_dir: str | None = None,
+    config_path: str | None = None,
+) -> None:
+    if config_path:
+        config.load_mrt_config(config_path)
+    refresh_from_config()
 
-    if args.config:
-        config.load_mrt_config(args.config)
-        refresh_from_config()
+    pickle_path = pickle_path or PICKLE_PATH
+    rfid_csv = rfid_csv or RFID_CSV
+    centers_txt = centers_txt or CENTERS_TXT
+    ts_csv = ts_csv or TS_CSV
+    out_dir = out_dir if out_dir is not None else OUT_DIR
 
-    out_dir = ensure_out_dir(PICKLE_PATH)
+    out_dir = ensure_out_dir(pickle_path, out_dir)
 
     # 1) 加载并按坐标重排为行优先网格
-    centers_raw = load_centers_txt(CENTERS_TXT)
+    centers_raw = load_centers_txt(centers_txt)
     idx_map, centers_grid = build_row_major_index(centers_raw, N_ROWS, N_COLS, Y_TOP_TO_BOTTOM)
     centers = centers_raw  # 通过 idx_map 访问
 
@@ -400,9 +410,9 @@ def main():
     print("[grid] bottom-right id", N_ROWS*N_COLS-1,  "->", centers_grid[N_ROWS-1, N_COLS-1])
 
     # 2) 读 timestamps / RFID / tracklets
-    frames_arr, times_arr = parse_timestamps_csv(TS_CSV)
-    df_rfid = parse_rfid_csv(RFID_CSV)
-    dd = load_tracklets_pickle(PICKLE_PATH)
+    frames_arr, times_arr = parse_timestamps_csv(ts_csv)
+    df_rfid = parse_rfid_csv(rfid_csv)
+    dd = load_tracklets_pickle(pickle_path)
 
     # 低频 tag 过滤（≤ 阈值）
     tag_counts_all = df_rfid["tag"].value_counts()
@@ -707,4 +717,11 @@ def main():
     print(f"  pickle 已更新（backup: {backup_path}）")
 
 if __name__ == "__main__":
-    main()
+    parser = argparse.ArgumentParser(description="Match RFID events to tracklets")
+    parser.add_argument("--config", dest="config_path", default=None, help="YAML file overriding MRT_* defaults")
+    parser.add_argument("--pickle", dest="pickle_path", default=None, help="Tracklet pickle file")
+    parser.add_argument("--rfid_csv", dest="rfid_csv", default=None, help="RFID event CSV file")
+    parser.add_argument("--centers", dest="centers_txt", default=None, help="Reader centers TXT file")
+    parser.add_argument("--ts", dest="ts_csv", default=None, help="Timestamps CSV file")
+    parser.add_argument("--out_dir", dest="out_dir", default=None, help="Directory for output files")
+    main(**vars(parser.parse_args()))
