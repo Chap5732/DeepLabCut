@@ -589,7 +589,7 @@ def main(
     }
 
     # 9) 写回 pickle + Tag 分配（一次完成）
-    orig_path = Path(PICKLE_PATH)
+    orig_path = Path(pickle_path)
     backup_path = orig_path.with_name(orig_path.name + ".bak")
     tmp_path = orig_path.with_name(orig_path.name + ".tmp")
 
