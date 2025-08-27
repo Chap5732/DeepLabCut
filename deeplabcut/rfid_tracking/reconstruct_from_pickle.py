@@ -412,7 +412,9 @@ def main(
     out_subdir: str | None = None,
 ) -> None:
     p_in = Path(pickle_in or PICKLE_IN)
-    out_subdir = out_subdir if out_subdir is not None else OUT_SUBDIR
+    # Use the configured subdirectory only when explicitly requested;
+    # passing ``None`` keeps outputs alongside the input pickle.
+    out_subdir = OUT_SUBDIR if out_subdir is not None else None
     p_out = p_in if pickle_out is None else Path(pickle_out)
     if out_subdir:
         out_dir = p_in.parent / out_subdir

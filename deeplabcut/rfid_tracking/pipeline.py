@@ -6,7 +6,10 @@ import logging
 
 from .make_video import main as make_video
 from .match_rfid_to_tracklets import main as match_rfid_to_tracklets
-from .reconstruct_from_pickle import main as reconstruct_from_pickle
+from .reconstruct_from_pickle import (
+    main as reconstruct_from_pickle,
+    OUT_SUBDIR as RECON_OUT_SUBDIR,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -150,8 +153,10 @@ def run_pipeline(
     reconstruct_from_pickle(
         pickle_in=str(track_pickle),
         pickle_out=None,
-        out_subdir=None,
+        out_subdir=RECON_OUT_SUBDIR,
     )
+    if RECON_OUT_SUBDIR:
+        track_pickle = track_pickle.parent / RECON_OUT_SUBDIR / track_pickle.name
     logger.info("Finished reconstructing identity chains for %s", track_pickle)
 
     # 5) generate visualization video
