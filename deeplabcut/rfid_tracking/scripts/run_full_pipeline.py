@@ -1,5 +1,10 @@
 #!/usr/bin/env python3
-"""Example CLI for running the complete RFID tracking pipeline."""
+"""Example CLI for running the complete RFID tracking pipeline.
+
+The script assumes that the DeepLabCut model was trained with ``shuffle=1``.
+If your model used a different shuffle index, pass it explicitly via the
+``--shuffle`` argument when running the script.
+"""
 
 from __future__ import annotations
 
@@ -24,7 +29,12 @@ def build_argparser() -> argparse.ArgumentParser:
         default=None,
         help="Subdirectory inside destfolder for intermediate outputs",
     )
-    parser.add_argument("--shuffle", type=int, default=1, help="DLC shuffle index")
+    parser.add_argument(
+        "--shuffle",
+        type=int,
+        default=1,
+        help="DLC shuffle index used during training (default: 1)",
+    )
     parser.add_argument(
         "--track-method",
         default="ellipse",
