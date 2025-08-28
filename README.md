@@ -1,12 +1,19 @@
 # DeepLabCut Extended Tracking Branch
 
+![Arena tracking cover](docs/images/arena_tracking_cover.jpg)
+
 This branch builds on the upstream [DeepLabCut](https://github.com/DeepLabCut/DeepLabCut) project to explore enhanced tracking capabilities.
 
 ## Core Extensions
 
-1. **Velocity-gated ellipse tracker** – The original ellipse tracker is augmented with a speed-space gate that filters unlikely associations based on motion, improving identity preservation when subjects move rapidly.
-2. **RFID-assisted long-term tracking** – Radio-frequency identification tags are incorporated to maintain subject identities across long experiments, allowing the system to re-identify individuals after occlusions or extended absences.
+### Velocity-gated ellipse tracker
+
+The tracker predicts subject motion and rejects unlikely matches by gating associations in both speed and space, yielding more robust identities than the default ellipse tracker when animals move quickly or cross paths.
+
+### RFID-assisted long-term tracking
+
+Integrating radio-frequency identification hardware allows antennas around the arena to read implanted tags. These reads periodically correct identities, enabling reliable long-term tracking even after extended occlusions or absences.
 
 ## Relationship to DeepLabCut
 
-These extensions are developed on top of the official DeepLabCut codebase and retain compatibility with its APIs and workflow. For comprehensive documentation, tutorials, and the full feature set, please refer to the [DeepLabCut repository](https://github.com/DeepLabCut/DeepLabCut).
+All features remain compatible with standard DeepLabCut projects, models, and APIs. Users can train networks and run analyses with the usual commands while opting into these tracking modules when needed. For installation details, tutorials, and the broader feature set, please consult the official [DeepLabCut documentation](https://github.com/DeepLabCut/DeepLabCut).
