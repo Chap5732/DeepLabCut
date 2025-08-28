@@ -32,6 +32,11 @@ def main() -> None:
         help="Output directory for intermediates",
     )
     parser.add_argument(
+        "--out-subdir",
+        default=cfg.OUT_SUBDIR,
+        help="Subdirectory within destfolder for intermediate and final outputs",
+    )
+    parser.add_argument(
         "--trainingsetindex", type=int, default=0, help="DLC training set index"
     )
     parser.add_argument(

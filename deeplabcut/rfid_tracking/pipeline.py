@@ -9,8 +9,6 @@ from .make_video import main as make_video
 from .match_rfid_to_tracklets import main as match_rfid_to_tracklets
 from .reconstruct_from_pickle import main as reconstruct_from_pickle
 
-RECON_OUT_SUBDIR = cfg.OUT_SUBDIR
-
 logger = logging.getLogger(__name__)
 
 
@@ -23,6 +21,7 @@ def run_pipeline(
     shuffle: int = 1,
     track_method: str = "ellipse",
     destfolder: Optional[str] = cfg.DESTFOLDER,
+    out_subdir: str | None = cfg.OUT_SUBDIR,
     trainingsetindex: int = 0,
     output_video: Optional[str] = None,
     config_override: str | Path | None = None,
@@ -51,11 +50,15 @@ def run_pipeline(
     destfolder : str, optional
         Directory for intermediate outputs. Defaults to ``cfg.DESTFOLDER``;
         if ``None``, uses the video folder.
+    out_subdir : str, optional
+        Subdirectory inside ``destfolder`` for intermediate and reconstruction
+        outputs. If ``None``, files are written directly to ``destfolder``.
     trainingsetindex : int, optional
         Training set index used for the DLC model, by default ``0``.
     output_video : str, optional
         Path of the final visualization video. If ``None``, a file named
-        ``<video>_rfid_tracklets_overlay.mp4`` will be created in ``destfolder``.
+        ``<video>_rfid_tracklets_overlay.mp4`` will be created in
+        ``destfolder`` or ``destfolder/out_subdir``.
     config_override : str | Path, optional
         YAML file to override values in :mod:`rfid_tracking.config` before
         running the pipeline.
@@ -155,8 +158,8 @@ def run_pipeline(
     # 3) match RFID events to tracklets
     logger.info("Matching RFID events from %s to tracklets: %s", rfid_csv, track_pickle)
     mrt_out_dir = (
-        dest / cfg.OUT_SUBDIR / "rfid_match_outputs"
-        if cfg.OUT_SUBDIR
+        dest / out_subdir / "rfid_match_outputs"
+        if out_subdir
         else dest / "rfid_match_outputs"
     )
     match_rfid_to_tracklets(
@@ -173,17 +176,21 @@ def run_pipeline(
     reconstruct_from_pickle(
         pickle_in=str(track_pickle),
         pickle_out=None,
-        out_subdir=RECON_OUT_SUBDIR,
+        out_subdir=out_subdir,
     )
-    if RECON_OUT_SUBDIR:
-        track_pickle = track_pickle.parent / RECON_OUT_SUBDIR / track_pickle.name
+    if out_subdir:
+        track_pickle = track_pickle.parent / out_subdir / track_pickle.name
     logger.info("Finished reconstructing identity chains for %s", track_pickle)
 
     # 5) generate visualization video
     out_vid = (
         Path(output_video)
         if output_video
-        else dest / f"{video_path.stem}_rfid_tracklets_overlay.mp4"
+        else (
+            dest / out_subdir / f"{video_path.stem}_rfid_tracklets_overlay.mp4"
+            if out_subdir
+            else dest / f"{video_path.stem}_rfid_tracklets_overlay.mp4"
+        )
     )
     logger.info(
         "Generating visualization video: %s using tracklets %s",

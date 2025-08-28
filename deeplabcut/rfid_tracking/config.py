@@ -11,15 +11,16 @@ BASE_DIR = Path(__file__).resolve().parent
 # 路径可根据实际项目调整
 PICKLE_IN = None
 PICKLE_OUT = None  # None 表示覆盖输入
-OUT_SUBDIR = "cap15"  # 输出子目录; 设为 None 则直接写入同级目录
+OUT_SUBDIR = None  # 输出子目录; 设为 None 则直接写入同级目录
 _dest = os.environ.get("DESTFOLDER")
 DESTFOLDER = Path(_dest) if _dest else None  # 中间结果输出目录; None 则使用视频所在目录
 
 VIDEO_PATH = PROJECT_ROOT / "deeplabcut/videos/test/demo.mp4"
 PICKLE_PATH = PICKLE_IN  # make_video 默认使用同一 pickle
 OUTPUT_VIDEO = (
-    PROJECT_ROOT
-    / "deeplabcut/projects/MiceTrackerFor20-Oppa-2024-12-08/analyze_videos/shuffle3/demo1/velocity_gating/CAP15/demo_tracked.mp4"
+    (DESTFOLDER / OUT_SUBDIR / f"{VIDEO_PATH.stem}_tracked.mp4")
+    if DESTFOLDER and OUT_SUBDIR
+    else (DESTFOLDER / f"{VIDEO_PATH.stem}_tracked.mp4" if DESTFOLDER else None)
 )
 
 CENTERS_TXT = PROJECT_ROOT / "analysis/data/jc0813/readers_centers.txt"
