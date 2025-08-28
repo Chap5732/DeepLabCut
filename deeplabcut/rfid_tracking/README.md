@@ -8,10 +8,18 @@
 
 ```bash
 python scripts/run_full_pipeline.py demo/config.yaml demo/video.mp4 demo/rfid.csv \
-    demo/readers_centers.txt demo/timestamps.csv --out-subdir demo_output
+    demo/readers_centers.txt demo/timestamps.csv --shuffle 1 --out-subdir demo_output
 ```
 
 要在自己的数据上运行，只需将上述路径替换为实际文件位置；命令默认会在输出目录下创建可视化视频。
+该脚本默认使用 DeepLabCut 模型的 ``shuffle=1``。如果训练时使用了其他
+shuffle 编号，可通过 ``--shuffle`` 参数显式指定（必要时也要设置
+``--trainingsetindex``）。例如：
+
+```bash
+python scripts/run_full_pipeline.py config.yaml video.mp4 rfid.csv \
+    readers_centers.txt timestamps.csv --shuffle 2 --out-subdir output2
+```
 
 ## 项目结构
 
@@ -71,7 +79,7 @@ project/
 ## 使用方法
 
 由于 `config.py` 中相关路径的默认值均为 `None`，运行前需通过命令行
-或 YAML 文件提供实际文件路径。下面给出一个最小示例：
+或 YAML 文件提供实际文件路径。下面给出示例配置与运行命令：
 
 ```yaml
 # paths.yaml
@@ -82,8 +90,11 @@ MRT_TS_CSV: /path/to/timestamps.csv
 ```
 
 ```bash
-python run_pipeline.py config.yaml /path/to/video.mp4 /path/to/rfid.csv \
-    /path/to/readers_centers.txt /path/to/timestamps.csv --config_override paths.yaml
+python run_pipeline.py config.yaml video.mp4 rfid.csv readers_centers.txt timestamps.csv \
+    --destfolder path/to/output \
+    --out-subdir session1 \
+    --shuffle 2 \
+    --config_override paths.yaml
 ```
 
 ### 一键全流程分析
@@ -96,21 +107,18 @@ run_rfid_pipeline(
     rfid_csv="path/to/rfid.csv",
     centers_txt="path/to/readers_centers.txt",
     ts_csv="path/to/timestamps.csv",
+    shuffle=1,                        # DLC 模型 shuffle 编号
     destfolder="path/to/output",  # 可选；若省略则使用 ``config.DESTFOLDER``
     out_subdir="session1",        # 可选；子目录，不填则直接写入目标目录
 )
 ```
 
-如果在 `config.py` 中设置了 ``DESTFOLDER``，命令行运行 `run_pipeline.py`
-时可通过 `--destfolder` 参数覆盖该默认目录；使用 `--out-subdir` 可
-指定在目标目录下创建子目录，省略该参数则结果直接写入目标目录。
-`--mrt_coil_diameter_px` 可临时设置线圈直径（像素）。
-
-示例命令行：
-```bash
-python run_pipeline.py config.yaml video.mp4 rfid.csv centers.txt ts.csv \
-    --destfolder path/to/output --out-subdir session1
-```
+上述命令演示了在命令行运行 `run_pipeline.py` 时如何通过 `--destfolder`
+覆盖 `config.DESTFOLDER`；使用 `--out-subdir` 可指定在目标目录下创建
+子目录，省略该参数则结果直接写入目标目录。脚本默认使用 DeepLabCut
+模型的 ``shuffle=1``，若训练时使用其他编号，请通过 ``--shuffle``
+指定（必要时 ``--trainingsetindex``）。`--mrt_coil_diameter_px` 可临时
+设置线圈直径（像素）。
 
 该函数依次调用：
 
@@ -256,14 +264,7 @@ DRAW_READERS: false
 ```
 
 在命令行运行全流程时，可使用 `--destfolder` 覆盖 `config.DESTFOLDER`，
-并通过 `--config_override` 传入该 YAML：
-
-```bash
-python run_pipeline.py config.yaml video.mp4 rfid.csv centers.txt ts.csv \
-    --destfolder ./outputs \
-    --config_override my_config.yaml \
-    --mrt_coil_diameter_px 120
-```
+并通过 `--config_override` 传入该 YAML（见前述示例）。
 
 ## 数据格式
 
