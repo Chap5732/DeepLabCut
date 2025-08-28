@@ -267,14 +267,7 @@ DRAW_READERS: false
 ```
 
 在命令行运行全流程时，可使用 `--destfolder` 覆盖 `config.DESTFOLDER`，
-并通过 `--config_override` 传入该 YAML：
-
-```bash
-python run_pipeline.py config.yaml video.mp4 rfid.csv centers.txt ts.csv \
-    --destfolder ./outputs \
-    --config_override my_config.yaml \
-    --mrt_coil_diameter_px 120
-```
+并通过 `--config_override` 传入该 YAML（示例命令见前文）。
 
 ## 数据格式
 
