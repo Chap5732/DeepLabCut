@@ -211,12 +211,17 @@ def CreateVideo(
                         color = colors[num_ind]
                     if trailpoints > 0:
                         for k in range(1, min(trailpoints, index + 1)):
-                            rr, cc = disk(
-                                (df_y[ind, index - k], df_x[ind, index - k]),
-                                dotsize,
-                                shape=(ny, nx),
-                            )
-                            image[rr, cc] = color
+                            if (
+                                df_likelihood[ind, index - k] > pcutoff
+                                and ~np.isnan(df_x[ind, index - k])
+                                and ~np.isnan(df_y[ind, index - k])
+                            ):
+                                rr, cc = disk(
+                                    (df_y[ind, index - k], df_x[ind, index - k]),
+                                    dotsize,
+                                    shape=(ny, nx),
+                                )
+                                image[rr, cc] = color
                     rr, cc = disk(
                         (df_y[ind, index], df_x[ind, index]), dotsize, shape=(ny, nx)
                     )
