@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 from pathlib import Path
 
 # Base directory for RFID tracking scripts
@@ -93,6 +95,34 @@ MRT_MIN_BURSTS_IF_LOWHITS = 2
 MRT_LOWHITS_THRESHOLD = 200
 
 
+def _apply_overrides(data: dict) -> None:
+    """Update module globals with ``data`` items if keys exist."""
+    for key, value in data.items():
+        key = key.upper()
+        if key in globals():
+            globals()[key] = value
+
+
+def load_config(path: str | Path | None) -> None:
+    """Override default settings from a YAML file.
+
+    Parameters
+    ----------
+    path : str | Path | None
+        YAML file containing overrides. If ``None`` the function returns
+        immediately.
+    """
+    if path is None:
+        return
+
+    import yaml
+
+    with open(path, "r", encoding="utf-8") as f:
+        data = yaml.safe_load(f) or {}
+
+    _apply_overrides(data)
+
+
 def load_mrt_config(yaml_path: str) -> None:
     """Override MRT_* defaults from a YAML file."""
     import yaml
@@ -100,8 +130,10 @@ def load_mrt_config(yaml_path: str) -> None:
     with open(yaml_path, "r", encoding="utf-8") as f:
         data = yaml.safe_load(f) or {}
 
-    for key, value in data.items():
-        key = key if key.startswith("MRT_") else f"MRT_{key}".upper()
-        if key in globals():
-            globals()[key] = value
+    overrides = {
+        (key if key.startswith("MRT_") else f"MRT_{key}".upper()): value
+        for key, value in data.items()
+    }
+
+    _apply_overrides(overrides)
 

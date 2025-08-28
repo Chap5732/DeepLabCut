@@ -25,6 +25,11 @@ def main() -> None:
     parser.add_argument("--destfolder", default=None, help="Output directory for intermediates")
     parser.add_argument("--trainingsetindex", type=int, default=0, help="DLC training set index")
     parser.add_argument("--output_video", default=None, help="Path for final overlay video")
+    parser.add_argument(
+        "--config_override",
+        default=None,
+        help="YAML file to override rfid_tracking.config settings",
+    )
     args = parser.parse_args()
     run_pipeline(**vars(args))
 

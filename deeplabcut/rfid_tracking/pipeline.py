@@ -26,6 +26,7 @@ def run_pipeline(
     destfolder: Optional[str] = None,
     trainingsetindex: int = 0,
     output_video: Optional[str] = None,
+    config_override: str | Path | None = None,
 ) -> str:
     """Run the full video + RFID analysis pipeline.
 
@@ -55,6 +56,9 @@ def run_pipeline(
     output_video : str, optional
         Path of the final visualization video. If ``None``, a file named
         ``<video>_rfid_tracklets_overlay.mp4`` will be created in ``destfolder``.
+    config_override : str | Path, optional
+        YAML file to override values in :mod:`rfid_tracking.config` before
+        running the pipeline.
 
     Notes
     -----
@@ -70,6 +74,8 @@ def run_pipeline(
     from deeplabcut import analyze_videos, convert_detections2tracklets
     from deeplabcut.utils import auxiliaryfunctions as aux
     from deeplabcut.utils.auxiliaryfunctions import get_scorer_name
+
+    cfg.load_config(config_override)
 
     config_path = Path(config_path)
     if not config_path.exists():
