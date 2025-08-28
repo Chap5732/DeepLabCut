@@ -80,25 +80,55 @@ def run_pipeline(
 
     cfg.load_config(config_override)
 
+    if config_path is None:
+        raise ValueError(
+            "config_path is required; provide via command line or configuration file"
+        )
     config_path = Path(config_path)
     if not config_path.exists():
         raise FileNotFoundError(f"Config file not found: {config_path}")
 
+    if video_path is None:
+        raise ValueError(
+            "video_path is required; provide via command line or configuration file"
+        )
     video_path = Path(video_path)
     if not video_path.exists():
         raise FileNotFoundError(f"Video file not found: {video_path}")
 
-    rfid_csv = Path(rfid_csv) if rfid_csv is not None else Path(cfg.MRT_RFID_CSV)
+    rfid_csv = (
+        Path(rfid_csv)
+        if rfid_csv is not None
+        else (Path(cfg.MRT_RFID_CSV) if cfg.MRT_RFID_CSV is not None else None)
+    )
+    if rfid_csv is None:
+        raise ValueError(
+            "rfid_csv is None; specify path via command line or set MRT_RFID_CSV in config"
+        )
     if not rfid_csv.exists():
         raise FileNotFoundError(f"RFID CSV file not found: {rfid_csv}")
 
     centers_txt = (
-        Path(centers_txt) if centers_txt is not None else Path(cfg.MRT_CENTERS_TXT)
+        Path(centers_txt)
+        if centers_txt is not None
+        else (Path(cfg.MRT_CENTERS_TXT) if cfg.MRT_CENTERS_TXT is not None else None)
     )
+    if centers_txt is None:
+        raise ValueError(
+            "centers_txt is None; specify path via command line or set MRT_CENTERS_TXT in config"
+        )
     if not centers_txt.exists():
         raise FileNotFoundError(f"Reader centers file not found: {centers_txt}")
 
-    ts_csv = Path(ts_csv) if ts_csv is not None else Path(cfg.MRT_TS_CSV)
+    ts_csv = (
+        Path(ts_csv)
+        if ts_csv is not None
+        else (Path(cfg.MRT_TS_CSV) if cfg.MRT_TS_CSV is not None else None)
+    )
+    if ts_csv is None:
+        raise ValueError(
+            "ts_csv is None; specify path via command line or set MRT_TS_CSV in config"
+        )
     if not ts_csv.exists():
         raise FileNotFoundError(f"Timestamps CSV file not found: {ts_csv}")
 

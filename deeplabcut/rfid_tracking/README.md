@@ -59,6 +59,22 @@ project/
 
 ## 使用方法
 
+由于 `config.py` 中相关路径的默认值均为 `None`，运行前需通过命令行
+或 YAML 文件提供实际文件路径。下面给出一个最小示例：
+
+```yaml
+# paths.yaml
+VIDEO_PATH: /path/to/video.mp4
+MRT_RFID_CSV: /path/to/rfid.csv
+MRT_CENTERS_TXT: /path/to/readers_centers.txt
+MRT_TS_CSV: /path/to/timestamps.csv
+```
+
+```bash
+python run_pipeline.py config.yaml /path/to/video.mp4 /path/to/rfid.csv \
+    /path/to/readers_centers.txt /path/to/timestamps.csv --config_override paths.yaml
+```
+
 ### 一键全流程分析
 ```python
 from deeplabcut import run_rfid_pipeline
