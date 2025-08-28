@@ -1,6 +1,22 @@
-# RFID DLC 追踪项目
+# DeepLabCut 扩展追踪分支（RFID DLC 追踪项目）
 
-这是一个基于DeepLabCut和RFID技术的动物行为追踪分析项目，用于重建动物移动轨迹并生成可视化视频。
+![Arena tracking cover](../../docs/images/arena_tracking_image.png)
+
+本分支在官方 [DeepLabCut](https://github.com/DeepLabCut/DeepLabCut) 基础上扩展了追踪能力，主要包含：
+
+- **速度门控椭圆追踪器**：通过速度与空间的双重门控预测并拒绝不合理匹配，在动物快速移动或交叉时仍能保持身份稳定。
+- **RFID 辅助的长期追踪**：在场地周围布设读卡器周期性校正身份，即便长时间遮挡也能维持准确追踪。
+
+所有功能与标准 DeepLabCut 项目和 API 兼容，更多使用教程可参见官方文档。
+
+## 安装与环境准备
+
+```bash
+git clone https://github.com/Chap5732/DeepLabCut.git
+cd DeepLabCut
+git checkout feat/velocity-gating
+pip install -e .
+```
 
 ## 项目结构
 
@@ -199,13 +215,9 @@ python scripts/run_make_video.py video.mp4 reconstructed.pickle readers_centers.
 - `rfid_tracklets_overlay.mp4`：可视化视频
 
 ## 示例脚本
-`scripts/` 目录中的脚本均已支持命令行参数，可作为最小示例直接运行：
+`scripts/` 目录中的脚本均已支持命令行参数，可作为最小示例直接运行（完整流程示例见前文“快速开始”）：
 
 ```bash
-# 运行完整流程（支持 --out-subdir）
-python scripts/run_full_pipeline.py config.yaml video.mp4 rfid.csv \
-    readers_centers.txt timestamps.csv --destfolder outputs --out-subdir session1
-
 # 单独执行各步骤
 python scripts/run_match_rfid.py tracklets.pickle rfid.csv readers_centers.txt \
     timestamps.csv --out-dir rfid_match_outputs
