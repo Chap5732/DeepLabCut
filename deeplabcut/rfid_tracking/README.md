@@ -69,13 +69,21 @@ run_rfid_pipeline(
     rfid_csv="path/to/rfid.csv",
     centers_txt="path/to/readers_centers.txt",
     ts_csv="path/to/timestamps.csv",
-    destfolder="path/to/output"  # 可选；若省略则使用 ``config.DESTFOLDER``
+    destfolder="path/to/output",  # 可选；若省略则使用 ``config.DESTFOLDER``
+    out_subdir="session1",        # 可选；子目录，不填则直接写入目标目录
 )
 ```
 
 如果在 `config.py` 中设置了 ``DESTFOLDER``，命令行运行 `run_pipeline.py`
-时可通过 `--destfolder` 参数覆盖该默认目录；`--mrt_coil_diameter_px`
-可临时设置线圈直径（像素）。
+时可通过 `--destfolder` 参数覆盖该默认目录；使用 `--out-subdir` 可
+指定在目标目录下创建子目录，省略该参数则结果直接写入目标目录。
+`--mrt_coil_diameter_px` 可临时设置线圈直径（像素）。
+
+示例命令行：
+```bash
+python run_pipeline.py config.yaml video.mp4 rfid.csv centers.txt ts.csv \
+    --destfolder path/to/output --out-subdir session1
+```
 
 该函数依次调用：
 
