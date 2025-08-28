@@ -1,29 +1,49 @@
 #!/usr/bin/env python3
-"""Match RFID readings to tracklets using preset file locations."""
+"""CLI wrapper to match RFID readings to tracklets."""
+
+from __future__ import annotations
+
+import argparse
 
 from deeplabcut.rfid_tracking import config as cfg
 from deeplabcut.rfid_tracking.match_rfid_to_tracklets import main as match_rfid
 
-# Default paths used in our local setup
-PICKLE_PATH = "/data/myproject/tracklets.pickle"
-RFID_CSV = "/data/myproject/rfid_events.csv"
-CENTERS_TXT = "/data/myproject/readers_centers.txt"
-TS_CSV = "/data/myproject/timestamps.csv"
-OUT_DIR = "/data/myproject/rfid_match_outputs"
-MRT_COIL_DIAMETER_PX = cfg.MRT_COIL_DIAMETER_PX  # Override coil diameter if needed
+
+def build_argparser() -> argparse.ArgumentParser:
+    parser = argparse.ArgumentParser(
+        description="Match RFID events to DLC tracklets",
+        formatter_class=argparse.ArgumentDefaultsHelpFormatter,
+    )
+    parser.add_argument("pickle_path", help="Tracklets pickle file")
+    parser.add_argument("rfid_csv", help="RFID events CSV file")
+    parser.add_argument("centers_txt", help="Reader centers text file")
+    parser.add_argument("ts_csv", help="Timestamps CSV used for alignment")
+    parser.add_argument(
+        "--out-dir",
+        default="./rfid_match_outputs",
+        help="Directory to store matching outputs",
+    )
+    parser.add_argument(
+        "--mrt-coil-diameter-px",
+        type=float,
+        default=None,
+        help="RFID coil diameter in pixels (overrides cfg.MRT_COIL_DIAMETER_PX)",
+    )
+    return parser
 
 
 def main() -> None:
-    """Execute :func:`match_rfid` with the predefined parameters."""
+    args = build_argparser().parse_args()
     match_rfid(
-        pickle_path=PICKLE_PATH,
-        rfid_csv=RFID_CSV,
-        centers_txt=CENTERS_TXT,
-        ts_csv=TS_CSV,
-        out_dir=OUT_DIR,
-        mrt_coil_diameter_px=MRT_COIL_DIAMETER_PX,
+        pickle_path=args.pickle_path,
+        rfid_csv=args.rfid_csv,
+        centers_txt=args.centers_txt,
+        ts_csv=args.ts_csv,
+        out_dir=args.out_dir,
+        mrt_coil_diameter_px=args.mrt_coil_diameter_px,
     )
 
 
 if __name__ == "__main__":
     main()
+

@@ -2,6 +2,17 @@
 
 这是一个基于DeepLabCut和RFID技术的动物行为追踪分析项目，用于重建动物移动轨迹并生成可视化视频。
 
+## 快速开始
+
+仓库自带了一套简短的示例数据（DLC 模型、视频、RFID 记录等），解压后可直接体验全流程：
+
+```bash
+python scripts/run_full_pipeline.py demo/config.yaml demo/video.mp4 demo/rfid.csv \
+    demo/readers_centers.txt demo/timestamps.csv --out-subdir demo_output
+```
+
+要在自己的数据上运行，只需将上述路径替换为实际文件位置；命令默认会在输出目录下创建可视化视频。
+
 ## 项目结构
 
 ```
@@ -122,11 +133,11 @@ python convert_detection2tracklets.py --config-path <项目config.yaml> --video-
 - `--videotype`：目录模式下的视频后缀
 
 ### 1. RFID 与 tracklet 匹配
+可单独调用 `scripts/run_match_rfid.py` 并显式提供路径：
+
 ```bash
-# 在 config.py 中设置 MRT_* 路径或提供 YAML 覆盖
-python match_rfid_to_tracklets.py                # 使用 config.py 中的默认值
-python match_rfid_to_tracklets.py --config my_mrt.yaml  # 读取外部 YAML
-python match_rfid_to_tracklets.py --mrt_coil_diameter_px 120  # 临时覆盖线圈直径
+python scripts/run_match_rfid.py tracklets.pickle rfid.csv readers_centers.txt \
+    timestamps.csv --out-dir rfid_match_outputs
 ```
 
 示例 YAML (`my_mrt.yaml`):
@@ -140,8 +151,8 @@ MRT_OUT_DIR: ./rfid_match_outputs
 
 ### 2. 轨迹重建
 ```bash
-# 根据实际情况修改 config.py 中的路径与门控参数
-python reconstruct_from_pickle.py
+python scripts/run_reconstruct.py tracklets_with_rfid.pickle \
+    --pickle-out reconstructed.pickle --out-subdir recon
 ```
 
 输出文件：
@@ -150,25 +161,28 @@ python reconstruct_from_pickle.py
 
 ### 3. 视频生成
 ```bash
-# 根据实际情况修改 config.py 中的路径与可视化参数
-python make_video.py
+python scripts/run_make_video.py video.mp4 reconstructed.pickle readers_centers.txt \
+    --output-video rfid_tracklets_overlay.mp4
 ```
 
 输出文件：
 - `rfid_tracklets_overlay.mp4`：可视化视频
 
 ## 示例脚本
-
-`scripts/` 目录提供了带有示例路径的便捷运行脚本，可快速测试各个步骤：
+`scripts/` 目录中的脚本均已支持命令行参数，可作为最小示例直接运行：
 
 ```bash
-python scripts/run_full_pipeline.py    # 运行完整流程
-python scripts/run_match_rfid.py       # 仅进行 RFID 匹配
-python scripts/run_reconstruct.py      # 轨迹重建
-python scripts/run_make_video.py       # 生成可视化视频
-```
+# 运行完整流程（支持 --out-subdir）
+python scripts/run_full_pipeline.py config.yaml video.mp4 rfid.csv \
+    readers_centers.txt timestamps.csv --destfolder outputs --out-subdir session1
 
-运行前请根据实际文件位置修改脚本顶部的常量。
+# 单独执行各步骤
+python scripts/run_match_rfid.py tracklets.pickle rfid.csv readers_centers.txt \
+    timestamps.csv --out-dir rfid_match_outputs
+python scripts/run_reconstruct.py tracklets_with_rfid.pickle --out-subdir recon
+python scripts/run_make_video.py video.mp4 reconstructed.pickle readers_centers.txt \
+    --output-video overlay.mp4
+```
 
 ## 配置参数
 
