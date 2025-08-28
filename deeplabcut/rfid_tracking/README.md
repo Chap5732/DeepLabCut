@@ -6,13 +6,20 @@
 
 ```
 project/
-├── utils.py                              # 核心工具函数库
-├── convert_detection2tracklets.py        # 检测结果转 tracklets
-├── convert_detection2tracklets_config.yaml  # 默认参数
+├── __init__.py                           # 便捷调用入口
 ├── config.py                             # 默认路径与门控参数
+├── pipeline.py                           # 串联各处理步骤的主流程
+├── run_pipeline.py                       # 命令行运行完整流程
+├── match_rfid_to_tracklets.py            # RFID 与 tracklet 匹配
 ├── reconstruct_from_pickle.py            # 轨迹重建脚本
 ├── make_video.py                         # 视频可视化脚本
-├── roi_definitions.json                  # ROI区域定义文件
+├── io.py                                 # 输入输出辅助函数
+├── utils.py                              # 核心工具函数库
+├── visualization.py                      # 绘图与显示工具
+├── convert_detection2tracklets.py        # 检测结果转 tracklets
+├── convert_detection2tracklets_config.yaml  # 默认参数
+├── roi_definitions.json                  # ROI 区域定义文件
+├── scripts/                              # 示例运行脚本
 └── README.md                             # 项目说明
 ```
 
@@ -120,6 +127,19 @@ python make_video.py
 
 输出文件：
 - `rfid_tracklets_overlay.mp4`：可视化视频
+
+## 示例脚本
+
+`scripts/` 目录提供了带有示例路径的便捷运行脚本，可快速测试各个步骤：
+
+```bash
+python scripts/run_full_pipeline.py    # 运行完整流程
+python scripts/run_match_rfid.py       # 仅进行 RFID 匹配
+python scripts/run_reconstruct.py      # 轨迹重建
+python scripts/run_make_video.py       # 生成可视化视频
+```
+
+运行前请根据实际文件位置修改脚本顶部的常量。
 
 ## 配置参数
 
