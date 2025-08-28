@@ -28,36 +28,11 @@ from .visualization import (
 )
 
 try:  # 允许作为脚本或模块运行
-    from . import config
+    from . import config as cfg
 except ImportError:  # pragma: no cover
-    import config
+    import config as cfg
 
-# ================== 配置参数 ==================
-VIDEO_PATH = config.VIDEO_PATH
-PICKLE_PATH = config.PICKLE_PATH
-OUTPUT_VIDEO = config.OUTPUT_VIDEO
-
-DRAW_READERS = config.DRAW_READERS
-CENTERS_TXT = config.CENTERS_TXT
-
-DRAW_ROIS = config.DRAW_ROIS
-ROI_FILE = config.ROI_FILE
-
-PCUTOFF = config.PCUTOFF
-TRAIL_LEN = config.TRAIL_LEN
-TAG_HOLD_FRAMES = config.TAG_HOLD_FRAMES
-
-SHOW_CHAIN = config.SHOW_CHAIN
-CHAIN_FALLBACK_ID = config.CHAIN_FALLBACK_ID
-CHAIN_TRAIL_LEN = config.CHAIN_TRAIL_LEN
-CHAIN_LINE_THICK = config.CHAIN_LINE_THICK
-CHAIN_POINT_R = config.CHAIN_POINT_R
-
-DRAW_LEGEND = config.DRAW_LEGEND
-LEGEND_COLS = config.LEGEND_COLS
-LEGEND_POS = config.LEGEND_POS
-
-MAX_FRAMES = config.MAX_FRAMES
+# Most tuning parameters live in config.py
 
 # ================== 小工具 ==================
 def draw_label_with_bg(
@@ -129,7 +104,7 @@ def build_per_frame_struct(dd: dict, pcutoff: float):
         if not isinstance(node, dict):
             continue
 
-        tk_trail[tk] = deque(maxlen=TRAIL_LEN)
+        tk_trail[tk] = deque(maxlen=cfg.TRAIL_LEN)
 
         # 提取每帧的中心点
         for fkey, arr in node.items():
@@ -158,7 +133,7 @@ def build_per_frame_struct(dd: dict, pcutoff: float):
 
         # 获取身份链键（chain_tag 优先，其次原始 tag，最后 fallback 到 chain_id）
         chain_key = node.get("chain_tag") or node.get("tag")
-        if chain_key is None and CHAIN_FALLBACK_ID:
+        if chain_key is None and cfg.CHAIN_FALLBACK_ID:
             chain_key = node.get("chain_id")
         chain_key_of_tk[tk] = str(chain_key) if chain_key is not None else None
 
@@ -199,7 +174,7 @@ def build_per_frame_struct(dd: dict, pcutoff: float):
     for f, items in frame2chain_center.items():
         for ck, _ in items:
             if ck not in chain_trail:
-                chain_trail[ck] = deque(maxlen=CHAIN_TRAIL_LEN)
+                chain_trail[ck] = deque(maxlen=cfg.CHAIN_TRAIL_LEN)
 
     frames_sorted = sorted(frames_set)
     return (
@@ -221,7 +196,7 @@ def draw_tracklets_layer(frame, frame_idx, pts_in_frame, tk_rfid_events, tk_trai
     # 更新轨迹
     for tk, (x, y) in pts_in_frame:
         xi, yi = int(round(x)), int(round(y))
-        tk_trail.setdefault(tk, deque(maxlen=TRAIL_LEN))
+        tk_trail.setdefault(tk, deque(maxlen=cfg.TRAIL_LEN))
         tk_trail[tk].append((frame_idx, xi, yi))
 
     # 绘制每个tracklet
@@ -259,7 +234,7 @@ def draw_tracklets_layer(frame, frame_idx, pts_in_frame, tk_rfid_events, tk_trai
 
         # RFID 标签（再更下方）
         tags_to_show = []
-        for df in range(TAG_HOLD_FRAMES):
+        for df in range(cfg.TAG_HOLD_FRAMES):
             fr = frame_idx - df
             if fr in tk_rfid_events.get(tk, {}):
                 tags_to_show.extend(tk_rfid_events[tk][fr])
@@ -292,7 +267,7 @@ def draw_chain_layer(frame, frame_idx, frame2chain_center, chain_trail):
     # 更新身份链轨迹
     for ck, (x, y) in items:
         xi, yi = int(round(x)), int(round(y))
-        chain_trail.setdefault(ck, deque(maxlen=CHAIN_TRAIL_LEN))
+        chain_trail.setdefault(ck, deque(maxlen=cfg.CHAIN_TRAIL_LEN))
         chain_trail[ck].append((frame_idx, xi, yi))
 
     # 绘制每个身份链
@@ -306,15 +281,17 @@ def draw_chain_layer(frame, frame_idx, frame2chain_center, chain_trail):
             f1, x1, y1 = trail[i]
             if f1 - f0 > 1:
                 continue
-            cv2.line(canvas, (x0, y0), (x1, y1), color, CHAIN_LINE_THICK, cv2.LINE_AA)
+            cv2.line(
+                canvas, (x0, y0), (x1, y1), color, cfg.CHAIN_LINE_THICK, cv2.LINE_AA
+            )
 
         # 当前位置点和标签（标签放上方）
         if trail:
             _, xi, yi = trail[-1]
-            cv2.circle(canvas, (xi, yi), CHAIN_POINT_R, color, -1, cv2.LINE_AA)
+            cv2.circle(canvas, (xi, yi), cfg.CHAIN_POINT_R, color, -1, cv2.LINE_AA)
             label = str(ck)
             (tw, th), base = cv2.getTextSize(label, cv2.FONT_HERSHEY_SIMPLEX, 0.6, 2)
-            text_org = (xi - tw // 2, yi - CHAIN_POINT_R - 10)  # 上方
+            text_org = (xi - tw // 2, yi - cfg.CHAIN_POINT_R - 10)  # 上方
             draw_label_with_bg(
                 canvas,
                 label,
@@ -372,10 +349,10 @@ def main(
     output_video: str | None = None,
 ) -> None:
     """主函数"""
-    video_path = video_path or VIDEO_PATH
-    pickle_path = pickle_path or PICKLE_PATH
-    centers_txt = centers_txt or CENTERS_TXT
-    output_video = output_video or OUTPUT_VIDEO
+    video_path = video_path or cfg.VIDEO_PATH
+    pickle_path = pickle_path or cfg.PICKLE_PATH
+    centers_txt = centers_txt or cfg.CENTERS_TXT
+    output_video = output_video or cfg.OUTPUT_VIDEO
 
     # 检查文件是否存在
     for pth, msg in [(video_path, "视频"), (pickle_path, "pickle")]:
@@ -396,22 +373,22 @@ def main(
         chain_key_of_tk,
         frame2chain_center,
         chain_trail,
-    ) = build_per_frame_struct(dd, PCUTOFF)
+    ) = build_per_frame_struct(dd, cfg.PCUTOFF)
 
     print(f"发现 {len(tk_trail)} 个tracklet，包含 {len(frames_sorted)} 个有效帧")
     print(f"检测到 {len([k for k in set(chain_key_of_tk.values()) if k])} 个身份键")
 
     # 加载读卡器位置（可选）
     reader_positions = None
-    if DRAW_READERS and Path(centers_txt).exists():
+    if cfg.DRAW_READERS and Path(centers_txt).exists():
         centers, meta = parse_centers(centers_txt)
         reader_positions = centers_to_reader_positions_column_major(centers, meta)
         print(f"读取到 {len(reader_positions)} 个读卡器位置")
 
     # 加载ROI（可选）
     rois = (
-        load_rois(ROI_FILE)
-        if (DRAW_ROIS and ROI_FILE and Path(ROI_FILE).exists())
+        load_rois(cfg.ROI_FILE)
+        if (cfg.DRAW_ROIS and cfg.ROI_FILE and Path(cfg.ROI_FILE).exists())
         else []
     )
     if rois:
@@ -433,7 +410,7 @@ def main(
     fourcc = cv2.VideoWriter_fourcc(*"mp4v")
     out = cv2.VideoWriter(output_video, fourcc, fps if fps > 0 else 25.0, (W, H))
 
-    max_frames = T if MAX_FRAMES is None else min(T, MAX_FRAMES)
+    max_frames = T if cfg.MAX_FRAMES is None else min(T, cfg.MAX_FRAMES)
     print(f"视频信息: {W}x{H}, {fps:.2f}fps, 共 {T} 帧；将输出 {max_frames} 帧")
 
     # 处理视频帧
@@ -470,11 +447,11 @@ def main(
             canvas = draw_tracklets_layer(canvas, fidx, pts, tk_rfid_events, tk_trail)
 
         # 绘制身份链
-        if SHOW_CHAIN:
+        if cfg.SHOW_CHAIN:
             canvas = draw_chain_layer(canvas, fidx, frame2chain_center, chain_trail)
-            if DRAW_LEGEND:
+            if cfg.DRAW_LEGEND:
                 canvas = draw_chain_legend(
-                    canvas, chain_trail, pos=LEGEND_POS, cols=LEGEND_COLS
+                    canvas, chain_trail, pos=cfg.LEGEND_POS, cols=cfg.LEGEND_COLS
                 )
 
         # 写入输出视频

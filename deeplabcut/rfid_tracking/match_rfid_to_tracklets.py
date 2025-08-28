@@ -11,26 +11,28 @@ RFID（按坐标重排→行优先 id）→ tracklet 累计读数 + 保守/智�
 """
 
 from __future__ import annotations
-import os
-import re
-import json
-import pickle
-from pathlib import Path
-from collections import defaultdict
+
 import argparse
+import json
+import os
+import pickle
+import re
+from collections import defaultdict
+from pathlib import Path
 
 import numpy as np
 import pandas as pd
 
-from . import config
+from . import config as cfg
 
+# Most tuning parameters live in config.py
 # ==========================
 # ====== 配置参数 ==========
 # ==========================
 
 
 def refresh_from_config() -> None:
-    """Sync module-level variables from ``config``."""
+    """Sync module-level variables from ``cfg``."""
     global PICKLE_PATH, RFID_CSV, CENTERS_TXT, TS_CSV, OUT_DIR
     global N_ROWS, N_COLS, ID_BASE, Y_TOP_TO_BOTTOM
     global PCUTOFF, RFID_FRAME_RANGE, COIL_DIAMETER_PX, HIT_MARGIN, HIT_RADIUS_PX
@@ -40,39 +42,39 @@ def refresh_from_config() -> None:
     global LOW_READS_HIGH_PURITY_ASSIGN, LOW_READS_PURITY_THRESHOLD
     global USE_FRAME_STABILITY_CHECK, BURST_GAP_FRAMES, MIN_BURSTS_IF_LOWHITS, LOWHITS_THRESHOLD
 
-    PICKLE_PATH = config.MRT_PICKLE_PATH
-    RFID_CSV = config.MRT_RFID_CSV
-    CENTERS_TXT = config.MRT_CENTERS_TXT
-    TS_CSV = config.MRT_TS_CSV
-    OUT_DIR = config.MRT_OUT_DIR
+    PICKLE_PATH = cfg.MRT_PICKLE_PATH
+    RFID_CSV = cfg.MRT_RFID_CSV
+    CENTERS_TXT = cfg.MRT_CENTERS_TXT
+    TS_CSV = cfg.MRT_TS_CSV
+    OUT_DIR = cfg.MRT_OUT_DIR
 
-    N_ROWS = config.MRT_N_ROWS
-    N_COLS = config.MRT_N_COLS
-    ID_BASE = config.MRT_ID_BASE
-    Y_TOP_TO_BOTTOM = config.MRT_Y_TOP_TO_BOTTOM
+    N_ROWS = cfg.MRT_N_ROWS
+    N_COLS = cfg.MRT_N_COLS
+    ID_BASE = cfg.MRT_ID_BASE
+    Y_TOP_TO_BOTTOM = cfg.MRT_Y_TOP_TO_BOTTOM
 
-    PCUTOFF = config.MRT_PCUTOFF
-    RFID_FRAME_RANGE = config.MRT_RFID_FRAME_RANGE
-    COIL_DIAMETER_PX = config.MRT_COIL_DIAMETER_PX
-    HIT_MARGIN = config.MRT_HIT_MARGIN
-    HIT_RADIUS_PX = config.MRT_HIT_RADIUS_PX
+    PCUTOFF = cfg.MRT_PCUTOFF
+    RFID_FRAME_RANGE = cfg.MRT_RFID_FRAME_RANGE
+    COIL_DIAMETER_PX = cfg.MRT_COIL_DIAMETER_PX
+    HIT_MARGIN = cfg.MRT_HIT_MARGIN
+    HIT_RADIUS_PX = cfg.MRT_HIT_RADIUS_PX
 
-    UNIQUE_NEIGHBOR_ONLY = config.MRT_UNIQUE_NEIGHBOR_ONLY
-    AMBIG_MARGIN_PX = config.MRT_AMBIG_MARGIN_PX
+    UNIQUE_NEIGHBOR_ONLY = cfg.MRT_UNIQUE_NEIGHBOR_ONLY
+    AMBIG_MARGIN_PX = cfg.MRT_AMBIG_MARGIN_PX
 
-    LOW_FREQ_TAG_MIN_COUNT = config.MRT_LOW_FREQ_TAG_MIN_COUNT
-    MIN_VALID_FRAMES_PER_TK = config.MRT_MIN_VALID_FRAMES_PER_TK
+    LOW_FREQ_TAG_MIN_COUNT = cfg.MRT_LOW_FREQ_TAG_MIN_COUNT
+    MIN_VALID_FRAMES_PER_TK = cfg.MRT_MIN_VALID_FRAMES_PER_TK
 
-    TAG_CONFIDENCE_THRESHOLD = config.MRT_TAG_CONFIDENCE_THRESHOLD
-    TAG_MIN_READS = config.MRT_TAG_MIN_READS
-    TAG_DOMINANT_RATIO = config.MRT_TAG_DOMINANT_RATIO
-    LOW_READS_HIGH_PURITY_ASSIGN = config.MRT_LOW_READS_HIGH_PURITY_ASSIGN
-    LOW_READS_PURITY_THRESHOLD = config.MRT_LOW_READS_PURITY_THRESHOLD
+    TAG_CONFIDENCE_THRESHOLD = cfg.MRT_TAG_CONFIDENCE_THRESHOLD
+    TAG_MIN_READS = cfg.MRT_TAG_MIN_READS
+    TAG_DOMINANT_RATIO = cfg.MRT_TAG_DOMINANT_RATIO
+    LOW_READS_HIGH_PURITY_ASSIGN = cfg.MRT_LOW_READS_HIGH_PURITY_ASSIGN
+    LOW_READS_PURITY_THRESHOLD = cfg.MRT_LOW_READS_PURITY_THRESHOLD
 
-    USE_FRAME_STABILITY_CHECK = config.MRT_USE_FRAME_STABILITY_CHECK
-    BURST_GAP_FRAMES = config.MRT_BURST_GAP_FRAMES
-    MIN_BURSTS_IF_LOWHITS = config.MRT_MIN_BURSTS_IF_LOWHITS
-    LOWHITS_THRESHOLD = config.MRT_LOWHITS_THRESHOLD
+    USE_FRAME_STABILITY_CHECK = cfg.MRT_USE_FRAME_STABILITY_CHECK
+    BURST_GAP_FRAMES = cfg.MRT_BURST_GAP_FRAMES
+    MIN_BURSTS_IF_LOWHITS = cfg.MRT_MIN_BURSTS_IF_LOWHITS
+    LOWHITS_THRESHOLD = cfg.MRT_LOWHITS_THRESHOLD
 
 
 # Load defaults
@@ -82,10 +84,14 @@ refresh_from_config()
 # ====== 工具函数 ===========
 # ==========================
 
+
 def ensure_out_dir(pickle_path: str, out_dir: str | None) -> Path:
-    out = Path(out_dir) if out_dir else (Path(pickle_path).parent / "rfid_match_outputs")
+    out = (
+        Path(out_dir) if out_dir else (Path(pickle_path).parent / "rfid_match_outputs")
+    )
     out.mkdir(parents=True, exist_ok=True)
     return out
+
 
 def load_centers_txt(txt_path: str) -> np.ndarray:
     arr = np.loadtxt(txt_path, dtype=float)
@@ -93,7 +99,10 @@ def load_centers_txt(txt_path: str) -> np.ndarray:
         raise ValueError("readers_centers.txt 必须是 N×2 的 x,y 列")
     return arr  # 原始顺序后续会重排
 
-def build_row_major_index(centers: np.ndarray, n_rows: int, n_cols: int, y_top_to_bottom: bool=True) -> tuple[np.ndarray, np.ndarray]:
+
+def build_row_major_index(
+    centers: np.ndarray, n_rows: int, n_cols: int, y_top_to_bottom: bool = True
+) -> tuple[np.ndarray, np.ndarray]:
     """
     将一列 N=n_rows*n_cols 个 (x,y) 位置按空间重排为 n_rows×n_cols 网格（上→下、左→右）。
     返回：
@@ -113,9 +122,9 @@ def build_row_major_index(centers: np.ndarray, n_rows: int, n_cols: int, y_top_t
     order = np.lexsort((xs, y_for_sort))  # 先 y 升序，再 x 升序
     idx_map = np.empty(N, dtype=int)
     for r in range(n_rows):
-        block = order[r*n_cols:(r+1)*n_cols]
+        block = order[r * n_cols : (r + 1) * n_cols]
         block_sorted = block[np.argsort(xs[block])]
-        idx_map[r*n_cols:(r+1)*n_cols] = block_sorted
+        idx_map[r * n_cols : (r + 1) * n_cols] = block_sorted
 
     centers_grid = centers[idx_map].reshape(n_rows, n_cols, 2)
 
@@ -126,12 +135,20 @@ def build_row_major_index(centers: np.ndarray, n_rows: int, n_cols: int, y_top_t
 
     return idx_map, centers_grid
 
+
 def parse_rfid_csv(csv_path: str) -> pd.DataFrame:
     df = pd.read_csv(csv_path)
     cols = {c.lower(): c for c in df.columns}
 
     # 时间列（自动识别）
-    time_keys = ["time","timestamp","datetime","ts","client_receive_time","client_recieve_time"]
+    time_keys = [
+        "time",
+        "timestamp",
+        "datetime",
+        "ts",
+        "client_receive_time",
+        "client_recieve_time",
+    ]
     time_k = next((cols.get(k) for k in time_keys if k in cols), None)
     if time_k is None:
         raise ValueError(f"RFID CSV 未找到时间列；候选：{time_keys}")
@@ -145,7 +162,10 @@ def parse_rfid_csv(csv_path: str) -> pd.DataFrame:
         time_sec = (t_series.astype("int64") / 1e9).astype(float)
 
     # 标签列
-    tag_k = next((cols.get(k) for k in ["tag","epc","tid","card_id","data"] if k in cols), None)
+    tag_k = next(
+        (cols.get(k) for k in ["tag", "epc", "tid", "card_id", "data"] if k in cols),
+        None,
+    )
     if tag_k is None:
         raise ValueError("RFID CSV 未找到标签列（tag/epc/tid/card_id/data）")
     tag_series = df[tag_k].astype(str).str.strip()
@@ -154,10 +174,11 @@ def parse_rfid_csv(csv_path: str) -> pd.DataFrame:
     id_list = []
     for _, row in df.iterrows():
         id_val = None
-        for k in ("id","reader_id"):
+        for k in ("id", "reader_id"):
             if k in row and pd.notna(row[k]):
                 try:
-                    id_val = int(row[k]); break
+                    id_val = int(row[k])
+                    break
                 except Exception:
                     pass
         if id_val is None:
@@ -167,28 +188,41 @@ def parse_rfid_csv(csv_path: str) -> pd.DataFrame:
                     m = re.search(r"/id/(\d+)", v) or re.search(r"id[=:](\d+)", v)
                     if m:
                         try:
-                            id_val = int(m.group(1)); break
+                            id_val = int(m.group(1))
+                            break
                         except Exception:
                             pass
         id_list.append(id_val)
 
-    out = pd.DataFrame({
-        "time": time_sec,
-        "tag": tag_series,
-        "id_raw": id_list,
-    })
-    out = out.dropna(subset=["time","tag"])
+    out = pd.DataFrame(
+        {
+            "time": time_sec,
+            "tag": tag_series,
+            "id_raw": id_list,
+        }
+    )
+    out = out.dropna(subset=["time", "tag"])
     return out
+
 
 def parse_timestamps_csv(ts_path: str) -> tuple[np.ndarray, np.ndarray]:
     df = pd.read_csv(ts_path)
     cols = {c.lower(): c for c in df.columns}
 
-    frame_k = next((cols.get(k) for k in ["frame","frame_id","fid","index"] if k in cols), None)
+    frame_k = next(
+        (cols.get(k) for k in ["frame", "frame_id", "fid", "index"] if k in cols), None
+    )
     if frame_k is None:
         raise ValueError("timestamps.csv 未找到帧列（frame/frame_id/fid/index）")
 
-    time_keys = ["time","timestamp","datetime","ts","client_receive_time","client_recieve_time"]
+    time_keys = [
+        "time",
+        "timestamp",
+        "datetime",
+        "ts",
+        "client_receive_time",
+        "client_recieve_time",
+    ]
     time_k = next((cols.get(k) for k in time_keys if k in cols), None)
     if time_k is None:
         raise ValueError(f"timestamps.csv 未找到时间列；候选：{time_keys}")
@@ -204,18 +238,27 @@ def parse_timestamps_csv(ts_path: str) -> tuple[np.ndarray, np.ndarray]:
 
     frames = pd.to_numeric(df[frame_k], errors="coerce").astype("int64").to_numpy()
     ok = np.isfinite(times) & np.isfinite(frames)
-    frames = frames[ok]; times = times[ok]
+    frames = frames[ok]
+    times = times[ok]
     order = np.argsort(times, kind="mergesort")
-    frames = frames[order]; times = times[order]
+    frames = frames[order]
+    times = times[order]
     uniq_t, idx = np.unique(times, return_index=True)
-    frames = frames[idx]; times = uniq_t
+    frames = frames[idx]
+    times = uniq_t
     return frames, times
 
+
 def time_to_nearest_frame(t: float, frames: np.ndarray, times: np.ndarray) -> int:
-    if t <= times[0]:  return int(frames[0])
-    if t >= times[-1]: return int(frames[-1])
+    if t <= times[0]:
+        return int(frames[0])
+    if t >= times[-1]:
+        return int(frames[-1])
     k = int(np.searchsorted(times, t, side="left"))
-    return int(frames[k-1] if abs(t - times[k-1]) <= abs(t - times[k]) else frames[k])
+    return int(
+        frames[k - 1] if abs(t - times[k - 1]) <= abs(t - times[k]) else frames[k]
+    )
+
 
 def load_tracklets_pickle(pkl_path: str) -> dict:
     with open(pkl_path, "rb") as f:
@@ -223,6 +266,7 @@ def load_tracklets_pickle(pkl_path: str) -> dict:
     if not isinstance(dd, dict) or "header" not in dd:
         raise ValueError("pickle 结构异常：未找到 'header'")
     return dd
+
 
 def frame_idx_from_key(k) -> int:
     if isinstance(k, (int, np.integer)):
@@ -232,6 +276,7 @@ def frame_idx_from_key(k) -> int:
     if not m:
         raise ValueError(f"无法从帧键 '{k}' 提取数字")
     return int(m[0])
+
 
 def find_mouse_center_index(header) -> int | None:
     try:
@@ -245,6 +290,7 @@ def find_mouse_center_index(header) -> int | None:
             return i
     return None
 
+
 def mean_confidence(arr: np.ndarray) -> float:
     try:
         p = arr[:, 2]
@@ -253,8 +299,16 @@ def mean_confidence(arr: np.ndarray) -> float:
     except Exception:
         return 0.0
 
-def body_center_from_arr(arr: np.ndarray, mc_idx: int | None, pcutoff: float) -> tuple[float,float] | None:
-    if arr is None or not isinstance(arr, np.ndarray) or arr.ndim != 2 or arr.shape[1] < 3:
+
+def body_center_from_arr(
+    arr: np.ndarray, mc_idx: int | None, pcutoff: float
+) -> tuple[float, float] | None:
+    if (
+        arr is None
+        or not isinstance(arr, np.ndarray)
+        or arr.ndim != 2
+        or arr.shape[1] < 3
+    ):
         return None
     if mc_idx is not None and mc_idx < arr.shape[0]:
         x, y, lk = arr[mc_idx, 0], arr[mc_idx, 1], arr[mc_idx, 2]
@@ -266,13 +320,15 @@ def body_center_from_arr(arr: np.ndarray, mc_idx: int | None, pcutoff: float) ->
     if not np.any(mask):
         return None
     w = np.clip(lk[mask], 0.0, None) + 1e-12
-    cx = float(np.nansum(xy[mask,0] * w) / np.nansum(w))
-    cy = float(np.nansum(xy[mask,1] * w) / np.nansum(w))
+    cx = float(np.nansum(xy[mask, 0] * w) / np.nansum(w))
+    cy = float(np.nansum(xy[mask, 1] * w) / np.nansum(w))
     if np.isfinite(cx) and np.isfinite(cy):
         return cx, cy
     return None
 
+
 # ---- 逐帧稳健性 & 分配 ----
+
 
 def _count_bursts_from_frames(frames_list, gap_frames=150) -> int:
     """[(frame, conf), ...] -> 估算独立命中波段数"""
@@ -281,9 +337,10 @@ def _count_bursts_from_frames(frames_list, gap_frames=150) -> int:
     fs = sorted(int(f) for f, _ in frames_list)
     bursts = 1
     for i in range(1, len(fs)):
-        if fs[i] - fs[i-1] >= gap_frames:
+        if fs[i] - fs[i - 1] >= gap_frames:
             bursts += 1
     return bursts
+
 
 def assign_tag_for_one_tracklet(
     counts_dict: dict[str, int],
@@ -312,21 +369,23 @@ def assign_tag_for_one_tracklet(
         lst = frames_dict.get(tg, []) if frames_dict else []
         return float(np.mean([c for _, c in lst])) if lst else 0.0
 
-    items = sorted(counts_dict.items(),
-                   key=lambda kv: (kv[1], avg_conf(kv[0])),
-                   reverse=True)
+    items = sorted(
+        counts_dict.items(), key=lambda kv: (kv[1], avg_conf(kv[0])), reverse=True
+    )
     top_tag, top_count = items[0][0], int(items[0][1])
     top_ratio = top_count / max(total_reads, 1)
 
     # === 新增“低读数但高纯度直通” ===
     if total_reads < min_reads_threshold:
         if LOW_READS_HIGH_PURITY_ASSIGN and top_ratio >= LOW_READS_PURITY_THRESHOLD:
-            diag.update({
-                "reason": "assigned_low_reads_high_purity",
-                "total_reads": total_reads,
-                "top": [top_tag, top_count],
-                "top_ratio": round(top_ratio, 3)
-            })
+            diag.update(
+                {
+                    "reason": "assigned_low_reads_high_purity",
+                    "total_reads": total_reads,
+                    "top": [top_tag, top_count],
+                    "top_ratio": round(top_ratio, 3),
+                }
+            )
             return str(top_tag), diag
         else:
             diag["reason"] = "low_reads"
@@ -343,39 +402,52 @@ def assign_tag_for_one_tracklet(
         if second == 0 or (top_count / max(second, 1)) >= dominant_ratio_threshold:
             pass
         else:
-            diag.update({
-                "reason": "ambiguous",
-                "total_reads": total_reads,
-                "top": [top_tag, top_count],
-                "second": [items[1][0], second],
-                "top_ratio": round(top_ratio, 3)
-            })
+            diag.update(
+                {
+                    "reason": "ambiguous",
+                    "total_reads": total_reads,
+                    "top": [top_tag, top_count],
+                    "second": [items[1][0], second],
+                    "top_ratio": round(top_ratio, 3),
+                }
+            )
             return None, diag
 
     # 规则 3（可选）：逐帧稳健性（仅对低命中段 < lowhits_threshold 更严格）
     if use_stability and total_reads < lowhits_threshold:
-        bursts = _count_bursts_from_frames(frames_dict.get(top_tag, []), gap_frames=burst_gap_frames) \
-                 if frames_dict else 0
+        bursts = (
+            _count_bursts_from_frames(
+                frames_dict.get(top_tag, []), gap_frames=burst_gap_frames
+            )
+            if frames_dict
+            else 0
+        )
         if bursts < min_bursts_if_lowhits:
-            diag.update({
-                "reason": "unstable_single_burst",
-                "bursts": bursts,
-                "total_reads": total_reads
-            })
+            diag.update(
+                {
+                    "reason": "unstable_single_burst",
+                    "bursts": bursts,
+                    "total_reads": total_reads,
+                }
+            )
             return None, diag
         diag["bursts"] = bursts
 
-    diag.update({
-        "reason": "assigned",
-        "total_reads": total_reads,
-        "top": [top_tag, top_count],
-        "top_ratio": round(top_ratio, 3)
-    })
+    diag.update(
+        {
+            "reason": "assigned",
+            "total_reads": total_reads,
+            "top": [top_tag, top_count],
+            "top_ratio": round(top_ratio, 3),
+        }
+    )
     return str(top_tag), diag
+
 
 # ==========================
 # ====== 主流程 =============
 # ==========================
+
 
 def main(
     *,
@@ -387,7 +459,7 @@ def main(
     config_path: str | None = None,
 ) -> None:
     if config_path:
-        config.load_mrt_config(config_path)
+        cfg.load_mrt_config(config_path)
     refresh_from_config()
 
     pickle_path = pickle_path or PICKLE_PATH
@@ -400,14 +472,26 @@ def main(
 
     # 1) 加载并按坐标重排为行优先网格
     centers_raw = load_centers_txt(centers_txt)
-    idx_map, centers_grid = build_row_major_index(centers_raw, N_ROWS, N_COLS, Y_TOP_TO_BOTTOM)
+    idx_map, centers_grid = build_row_major_index(
+        centers_raw, N_ROWS, N_COLS, Y_TOP_TO_BOTTOM
+    )
     centers = centers_raw  # 通过 idx_map 访问
 
     # 自检：打印四角
     print("[grid] top-left     id 0           ->", centers_grid[0, 0])
-    print("[grid] top-right    id 11          ->", centers_grid[0, N_COLS-1])
-    print("[grid] bottom-left  id", (N_ROWS-1)*N_COLS, "->", centers_grid[N_ROWS-1, 0])
-    print("[grid] bottom-right id", N_ROWS*N_COLS-1,  "->", centers_grid[N_ROWS-1, N_COLS-1])
+    print("[grid] top-right    id 11          ->", centers_grid[0, N_COLS - 1])
+    print(
+        "[grid] bottom-left  id",
+        (N_ROWS - 1) * N_COLS,
+        "->",
+        centers_grid[N_ROWS - 1, 0],
+    )
+    print(
+        "[grid] bottom-right id",
+        N_ROWS * N_COLS - 1,
+        "->",
+        centers_grid[N_ROWS - 1, N_COLS - 1],
+    )
 
     # 2) 读 timestamps / RFID / tracklets
     frames_arr, times_arr = parse_timestamps_csv(ts_csv)
@@ -416,7 +500,9 @@ def main(
 
     # 低频 tag 过滤（≤ 阈值）
     tag_counts_all = df_rfid["tag"].value_counts()
-    low_tags = set(tag_counts_all[tag_counts_all <= LOW_FREQ_TAG_MIN_COUNT].index.tolist())
+    low_tags = set(
+        tag_counts_all[tag_counts_all <= LOW_FREQ_TAG_MIN_COUNT].index.tolist()
+    )
     if low_tags:
         df_rfid = df_rfid[~df_rfid["tag"].isin(low_tags)].copy()
 
@@ -425,7 +511,9 @@ def main(
     mc_idx = find_mouse_center_index(header)
 
     # 3) 构建: frame -> [(tk, (cx,cy), mean_conf)]
-    frame2points: dict[int, list[tuple[object, tuple[float,float], float]]] = defaultdict(list)
+    frame2points: dict[
+        int, list[tuple[object, tuple[float, float], float]]
+    ] = defaultdict(list)
     valid_frame_count: dict[object, int] = defaultdict(int)
     for tk, node in dd.items():
         if tk in ("header", "single"):
@@ -445,7 +533,9 @@ def main(
             valid_frame_count[tk] += 1
 
     # 剔除有效帧过少的 tracklet
-    bad_tks = {tk for tk, cnt in valid_frame_count.items() if cnt < MIN_VALID_FRAMES_PER_TK}
+    bad_tks = {
+        tk for tk, cnt in valid_frame_count.items() if cnt < MIN_VALID_FRAMES_PER_TK
+    }
     if bad_tks:
         for f in list(frame2points.keys()):
             frame2points[f] = [t for t in frame2points[f] if t[0] not in bad_tks]
@@ -497,7 +587,9 @@ def main(
     # 6) 逐帧扫描并竞争分配（含诊断）
     half_win = int(RFID_FRAME_RANGE // 2)
     tk_tag_counts: dict[object, dict[str, int]] = defaultdict(lambda: defaultdict(int))
-    tk_tag_frames: dict[object, dict[str, list[tuple[int, float]]]] = defaultdict(lambda: defaultdict(list))
+    tk_tag_frames: dict[object, dict[str, list[tuple[int, float]]]] = defaultdict(
+        lambda: defaultdict(list)
+    )
     stats = defaultdict(int)
 
     all_frames_sorted = sorted(frame2points.keys())
@@ -553,12 +645,15 @@ def main(
             tag_names_all.add(tg)
     df_counts_long = pd.DataFrame(rows_counts)
     if df_counts_long.empty:
-        df_counts_long = pd.DataFrame(columns=["tracklet","tag","total_hits"])
+        df_counts_long = pd.DataFrame(columns=["tracklet", "tag", "total_hits"])
 
     if not df_counts_long.empty:
         df_counts_wide = df_counts_long.pivot_table(
-            index="tracklet", columns="tag", values="total_hits",
-            fill_value=0, aggfunc="sum"
+            index="tracklet",
+            columns="tag",
+            values="total_hits",
+            fill_value=0,
+            aggfunc="sum",
         ).sort_index(axis=0)
     else:
         df_counts_wide = pd.DataFrame()
@@ -583,9 +678,13 @@ def main(
             },
         },
         "events_total": int(len(events)),
-        **{"events_out_of_ts_range": int(events_stats.get("events_out_of_ts_range", 0)),
-           "events_no_reader_xy": int(events_stats.get("events_no_reader_xy", 0))},
-        "assign_stats_stage_match": {k:int(v) for k,v in stats.items()},
+        **{
+            "events_out_of_ts_range": int(
+                events_stats.get("events_out_of_ts_range", 0)
+            ),
+            "events_no_reader_xy": int(events_stats.get("events_no_reader_xy", 0)),
+        },
+        "assign_stats_stage_match": {k: int(v) for k, v in stats.items()},
     }
 
     # 9) 写回 pickle + Tag 分配（一次完成）
@@ -594,7 +693,13 @@ def main(
     tmp_path = orig_path.with_name(orig_path.name + ".tmp")
 
     dd_out = dict(dd)
-    assign_stats = {"high_confidence": 0, "medium_confidence": 0, "low_reads": 0, "ambiguous": 0, "unstable": 0}
+    assign_stats = {
+        "high_confidence": 0,
+        "medium_confidence": 0,
+        "low_reads": 0,
+        "ambiguous": 0,
+        "unstable": 0,
+    }
     assignments = {}
 
     for tk, node in list(dd_out.items()):
@@ -603,7 +708,10 @@ def main(
 
         # 写回计数与逐帧
         counts_dict = {tg: int(cnt) for tg, cnt in tk_tag_counts.get(tk, {}).items()}
-        frames_dict = {tg: [(int(f), float(c)) for (f, c) in lst] for tg, lst in tk_tag_frames.get(tk, {}).items()}
+        frames_dict = {
+            tg: [(int(f), float(c)) for (f, c) in lst]
+            for tg, lst in tk_tag_frames.get(tk, {}).items()
+        }
         node["rfid_counts"] = counts_dict if counts_dict else {}
         node["rfid_frames"] = frames_dict if frames_dict else {}
 
@@ -640,7 +748,7 @@ def main(
                 "min_bursts_if_lowhits": MIN_BURSTS_IF_LOWHITS,
                 "lowhits_threshold": LOWHITS_THRESHOLD,
             },
-            **hint
+            **hint,
         }
 
         dd_out[tk] = node
@@ -668,18 +776,35 @@ def main(
         if assigned and total > 0:
             conf = counts.get(assigned, 0) / total
             vals_sorted = sorted(counts.values(), reverse=True)
-            dom_ratio = (vals_sorted[0] / max(vals_sorted[1], 1)) if len(vals_sorted) >= 2 else float("inf")
+            dom_ratio = (
+                (vals_sorted[0] / max(vals_sorted[1], 1))
+                if len(vals_sorted) >= 2
+                else float("inf")
+            )
         else:
             conf, dom_ratio = 0.0, 0.0
-        assign_rows.append({
-            "tracklet": tk,
-            "assigned_tag": assigned if assigned else "UNASSIGNED",
-            "total_reads": total,
-            "confidence": round(conf, 3),
-            "dominance_ratio": ("INF" if dom_ratio == float("inf") else round(dom_ratio, 2)),
-            "tag_distribution": "|".join([f"{tag}:{cnt}" for tag, cnt in sorted(counts.items(), key=lambda x: x[1], reverse=True)])
-        })
-    pd.DataFrame(assign_rows).to_csv(out_dir / "tag_assignments.csv", index=False, encoding="utf-8")
+        assign_rows.append(
+            {
+                "tracklet": tk,
+                "assigned_tag": assigned if assigned else "UNASSIGNED",
+                "total_reads": total,
+                "confidence": round(conf, 3),
+                "dominance_ratio": (
+                    "INF" if dom_ratio == float("inf") else round(dom_ratio, 2)
+                ),
+                "tag_distribution": "|".join(
+                    [
+                        f"{tag}:{cnt}"
+                        for tag, cnt in sorted(
+                            counts.items(), key=lambda x: x[1], reverse=True
+                        )
+                    ]
+                ),
+            }
+        )
+    pd.DataFrame(assign_rows).to_csv(
+        out_dir / "tag_assignments.csv", index=False, encoding="utf-8"
+    )
 
     # 11) 更新 meta.json（加入分配统计）
     meta["tag_assignment"] = {
@@ -716,12 +841,26 @@ def main(
     print(f"  meta.json:           {out_dir/'meta.json'}")
     print(f"  pickle 已更新（backup: {backup_path}）")
 
+
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Match RFID events to tracklets")
-    parser.add_argument("--config", dest="config_path", default=None, help="YAML file overriding MRT_* defaults")
-    parser.add_argument("--pickle", dest="pickle_path", default=None, help="Tracklet pickle file")
-    parser.add_argument("--rfid_csv", dest="rfid_csv", default=None, help="RFID event CSV file")
-    parser.add_argument("--centers", dest="centers_txt", default=None, help="Reader centers TXT file")
+    parser.add_argument(
+        "--config",
+        dest="config_path",
+        default=None,
+        help="YAML file overriding MRT_* defaults",
+    )
+    parser.add_argument(
+        "--pickle", dest="pickle_path", default=None, help="Tracklet pickle file"
+    )
+    parser.add_argument(
+        "--rfid_csv", dest="rfid_csv", default=None, help="RFID event CSV file"
+    )
+    parser.add_argument(
+        "--centers", dest="centers_txt", default=None, help="Reader centers TXT file"
+    )
     parser.add_argument("--ts", dest="ts_csv", default=None, help="Timestamps CSV file")
-    parser.add_argument("--out_dir", dest="out_dir", default=None, help="Directory for output files")
+    parser.add_argument(
+        "--out_dir", dest="out_dir", default=None, help="Directory for output files"
+    )
     main(**vars(parser.parse_args()))
