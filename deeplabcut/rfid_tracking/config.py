@@ -71,7 +71,12 @@ MRT_PICKLE_PATH = PICKLE_IN
 MRT_RFID_CSV = PROJECT_ROOT / "analysis/data/jc0813/rfid_data_20250813_055827.csv"
 MRT_CENTERS_TXT = CENTERS_TXT
 MRT_TS_CSV = PROJECT_ROOT / "analysis/data/jc0813/record_20250813_053913_timestamps.csv"
-MRT_OUT_DIR = PROJECT_ROOT / "analysis/data/jc0813/rfid_match_outputs"
+_mrt_base = PROJECT_ROOT / "analysis/data/jc0813"
+MRT_OUT_DIR = (
+    _mrt_base / OUT_SUBDIR / "rfid_match_outputs"
+    if OUT_SUBDIR
+    else _mrt_base / "rfid_match_outputs"
+)
 
 MRT_N_ROWS = 12
 MRT_N_COLS = 12
