@@ -138,18 +138,13 @@ def CreateVideo(
     if Dataframe.columns.nlevels == 3:
         nindividuals = int(len(all_bpts) / len(set(all_bpts)))
         map2bp = list(np.repeat(list(range(len(set(all_bpts)))), nindividuals))
-        map2id = list(range(nindividuals)) * len(set(all_bpts))
+        id2idx = {i: i for i in range(nindividuals)}
     else:
-        nindividuals = len(Dataframe.columns.get_level_values("individuals").unique())
         map2bp = [bplist.index(bp) for bp in all_bpts]
-        nbpts_per_ind = (
-            Dataframe.groupby(level="individuals", axis=1).size().values // 3
-        )
-        map2id = []
-        for i, j in enumerate(nbpts_per_ind):
-            map2id.extend([i] * j)
+        individuals_all = Dataframe.columns.get_level_values("individuals").unique()
+        nindividuals = len(individuals_all)
+        id2idx = {ind: i for i, ind in enumerate(individuals_all)}
     keep = np.flatnonzero(np.isin(all_bpts, bodyparts2plot))
-    bpts2color = [(ind, map2bp[ind], map2id[ind]) for ind in keep]
 
     if color_by == "bodypart":
         C = colorclass.to_rgba(np.linspace(0, 1, nbodyparts))
@@ -202,6 +197,13 @@ def CreateVideo(
                             int(np.clip(df_x[bpt2, index], 1, nx - 1)),
                         )
                         image[rr, cc] = color_for_skeleton
+
+            if Dataframe.columns.nlevels == 3:
+                map2id = list(range(nindividuals)) * len(set(all_bpts))
+            else:
+                ind_names = Dataframe.columns.get_level_values("individuals")[::3]
+                map2id = [id2idx[name] for name in ind_names]
+            bpts2color = [(ind, map2bp[ind], map2id[ind]) for ind in keep]
 
             for ind, num_bp, num_ind in bpts2color:
                 if df_likelihood[ind, index] > pcutoff:
@@ -304,18 +306,13 @@ def CreateVideoSlow(
     if Dataframe.columns.nlevels == 3:
         nindividuals = int(len(all_bpts) / len(set(all_bpts)))
         map2bp = list(np.repeat(list(range(len(set(all_bpts)))), nindividuals))
-        map2id = list(range(nindividuals)) * len(set(all_bpts))
+        id2idx = {i: i for i in range(nindividuals)}
     else:
-        nindividuals = len(Dataframe.columns.get_level_values("individuals").unique())
         map2bp = [bplist.index(bp) for bp in all_bpts]
-        nbpts_per_ind = (
-            Dataframe.groupby(level="individuals", axis=1).size().values // 3
-        )
-        map2id = []
-        for i, j in enumerate(nbpts_per_ind):
-            map2id.extend([i] * j)
+        individuals_all = Dataframe.columns.get_level_values("individuals").unique()
+        nindividuals = len(individuals_all)
+        id2idx = {ind: i for i, ind in enumerate(individuals_all)}
     keep = np.flatnonzero(np.isin(all_bpts, bodyparts2plot))
-    bpts2color = [(ind, map2bp[ind], map2id[ind]) for ind in keep]
     if color_by == "individual":
         colors = visualization.get_cmap(nindividuals, name=colormap)
     else:
@@ -383,6 +380,13 @@ def CreateVideoSlow(
                                 color=skeleton_color,
                                 alpha=alphavalue,
                             )
+
+                if Dataframe.columns.nlevels == 3:
+                    map2id = list(range(nindividuals)) * len(set(all_bpts))
+                else:
+                    ind_names = Dataframe.columns.get_level_values("individuals")[::3]
+                    map2id = [id2idx[name] for name in ind_names]
+                bpts2color = [(ind, map2bp[ind], map2id[ind]) for ind in keep]
 
                 # Draw bodyparts
                 for ind, num_bp, num_ind in bpts2color:

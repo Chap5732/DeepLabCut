@@ -53,12 +53,24 @@ def reorder_individuals_in_df(df: pd.DataFrame, order: list) -> pd.DataFrame:
             Reordered DataFrame
     """
     columns = df.columns
-    inds = df.index
+    if "individuals" not in columns.names:
+        return df
 
-    data = df.loc(axis=1)[:, order].to_numpy()
-    df = pd.DataFrame(data, columns=columns, index=inds)
-
-    return df
+    individuals_present = columns.get_level_values("individuals").unique().tolist()
+    df_reordered = df.reindex(order, axis=1, level="individuals")
+    df_reordered.columns = df_reordered.columns.set_levels(order, level="individuals")
+    missing = [ind for ind in order if ind not in individuals_present]
+    if missing:
+        template = df.loc[:, pd.IndexSlice[:, individuals_present[0], :, :]]
+        for ind in missing:
+            empty = pd.DataFrame(np.nan, index=df.index, columns=template.columns)
+            empty = empty.rename(
+                columns={individuals_present[0]: ind}, level="individuals"
+            )
+            df_reordered = pd.concat([df_reordered, empty], axis=1)
+        df_reordered = df_reordered.reindex(order, axis=1, level="individuals")
+        df_reordered.columns = df_reordered.columns.set_levels(order, level="individuals")
+    return df_reordered
 
 
 def extractindividualsandbodyparts(cfg):

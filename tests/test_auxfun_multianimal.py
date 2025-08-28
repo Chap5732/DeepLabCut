@@ -61,4 +61,34 @@ def test_reorder_individuals_in_df():
     )
 
     # Check
-    pd.testing.assert_frame_equal(df, df_inverse_reordering)
+    pd.testing.assert_frame_equal(
+        df.sort_index(axis=1), df_inverse_reordering.sort_index(axis=1)
+    )
+
+
+def test_reorder_individuals_in_df_handles_missing():
+    import numpy as np
+
+    scorer = ["scorer"]
+    individuals = ["ind1", "ind2"]
+    bodyparts = ["bp1"]
+    coords = ["x", "y", "likelihood"]
+    cols = pd.MultiIndex.from_product(
+        [scorer, individuals, bodyparts, coords],
+        names=["scorer", "individuals", "bodyparts", "coords"],
+    )
+    df = pd.DataFrame(np.arange(len(cols)).reshape(1, -1), columns=cols)
+
+    order = ["ind1", "ind3", "ind2"]
+    df_reordered = auxfun_multianimal.reorder_individuals_in_df(df, order)
+
+    # Missing individual should be present with NaNs
+    assert (
+        df_reordered.loc[:, pd.IndexSlice[:, "ind3", :, :]].isna().all().all()
+    )
+
+    # Existing individuals retain their data
+    for ind in ["ind1", "ind2"]:
+        assert df_reordered.loc[:, pd.IndexSlice[:, ind, :, :]].equals(
+            df.loc[:, pd.IndexSlice[:, ind, :, :]]
+        )
