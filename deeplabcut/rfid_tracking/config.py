@@ -3,27 +3,24 @@ from __future__ import annotations
 import os
 from pathlib import Path
 
-PROJECT_ROOT = Path("/ssd01/user_acc_data/oppa")
+_project_root = os.environ.get("PROJECT_ROOT")
 # Base directory for RFID tracking scripts
+PROJECT_ROOT = Path(_project_root) if _project_root else Path.cwd()
 BASE_DIR = Path(__file__).resolve().parent
 
 # ================== 默认路径 ==================
-# 路径可根据实际项目调整
+# 路径需通过命令行或 YAML 覆盖
 PICKLE_IN = None
 PICKLE_OUT = None  # None 表示覆盖输入
 OUT_SUBDIR = None  # 输出子目录; 设为 None 则直接写入同级目录
 _dest = os.environ.get("DESTFOLDER")
 DESTFOLDER = Path(_dest) if _dest else None  # 中间结果输出目录; None 则使用视频所在目录
 
-VIDEO_PATH = PROJECT_ROOT / "deeplabcut/videos/test/demo.mp4"
-PICKLE_PATH = PICKLE_IN  # make_video 默认使用同一 pickle
-OUTPUT_VIDEO = (
-    (DESTFOLDER / OUT_SUBDIR / f"{VIDEO_PATH.stem}_tracked.mp4")
-    if DESTFOLDER and OUT_SUBDIR
-    else (DESTFOLDER / f"{VIDEO_PATH.stem}_tracked.mp4" if DESTFOLDER else None)
-)
+VIDEO_PATH = None  # 视频文件路径，需通过命令行或 YAML 指定
+PICKLE_PATH = None  # make_video 使用的 pickle 文件路径，需指定
+OUTPUT_VIDEO = None  # 输出视频路径，未指定则在运行时生成
 
-CENTERS_TXT = PROJECT_ROOT / "analysis/data/jc0813/readers_centers.txt"
+CENTERS_TXT = None  # RFID 读写器中心坐标文件，需指定
 ROI_FILE = (
     PROJECT_ROOT / "analysis/rfid_dlc_tracking/version2_tracking/roi_definitions.json"
 )
@@ -71,9 +68,9 @@ MAX_FRAMES = None
 # ================== match_rfid_to_tracklets 默认参数 ==================
 # 路径可在此修改，或通过 load_mrt_config 从 YAML 覆盖
 MRT_PICKLE_PATH = PICKLE_IN
-MRT_RFID_CSV = PROJECT_ROOT / "analysis/data/jc0813/rfid_data_20250813_055827.csv"
-MRT_CENTERS_TXT = CENTERS_TXT
-MRT_TS_CSV = PROJECT_ROOT / "analysis/data/jc0813/record_20250813_053913_timestamps.csv"
+MRT_RFID_CSV = None  # RFID 事件 CSV，需通过命令行或 YAML 指定
+MRT_CENTERS_TXT = None  # 读写器中心坐标文件，需指定
+MRT_TS_CSV = None  # 时间戳 CSV，需指定
 MRT_OUT_DIR = (
     DESTFOLDER / OUT_SUBDIR / "rfid_match_outputs"
     if DESTFOLDER and OUT_SUBDIR
