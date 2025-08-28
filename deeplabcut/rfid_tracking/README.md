@@ -8,7 +8,7 @@
 
 ```bash
 python scripts/run_full_pipeline.py demo/config.yaml demo/video.mp4 demo/rfid.csv \
-    demo/readers_centers.txt demo/timestamps.csv --out-subdir demo_output
+    demo/readers_centers.txt demo/timestamps.csv --shuffle 1 --out-subdir demo_output
 ```
 
 要在自己的数据上运行，只需将上述路径替换为实际文件位置；命令默认会在输出目录下创建可视化视频。
@@ -104,6 +104,7 @@ run_rfid_pipeline(
     rfid_csv="path/to/rfid.csv",
     centers_txt="path/to/readers_centers.txt",
     ts_csv="path/to/timestamps.csv",
+    shuffle=1,                        # DLC 模型 shuffle 编号
     destfolder="path/to/output",  # 可选；若省略则使用 ``config.DESTFOLDER``
     out_subdir="session1",        # 可选；子目录，不填则直接写入目标目录
 )
