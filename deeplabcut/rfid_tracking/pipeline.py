@@ -4,6 +4,7 @@ from pathlib import Path
 from typing import Optional
 import logging
 
+from . import config as cfg
 from .make_video import main as make_video
 from .match_rfid_to_tracklets import main as match_rfid_to_tracklets
 from .reconstruct_from_pickle import (
@@ -17,9 +18,9 @@ logger = logging.getLogger(__name__)
 def run_pipeline(
     config_path: str,
     video_path: str,
-    rfid_csv: str,
-    centers_txt: str,
-    ts_csv: str,
+    rfid_csv: Optional[str] = None,
+    centers_txt: Optional[str] = None,
+    ts_csv: Optional[str] = None,
     shuffle: int = 1,
     track_method: str = "ellipse",
     destfolder: Optional[str] = None,
@@ -34,12 +35,15 @@ def run_pipeline(
         Path to the DLC project ``config.yaml``.
     video_path : str
         Video file to be analyzed.
-    rfid_csv : str
-        CSV file containing RFID events.
-    centers_txt : str
-        Text file with reader (x, y) coordinates.
-    ts_csv : str
-        CSV with timestamps used to align RFID and video frames.
+    rfid_csv : str, optional
+        CSV file containing RFID events. If ``None``,
+        ``cfg.MRT_RFID_CSV`` from :mod:`rfid_tracking.config` is used.
+    centers_txt : str, optional
+        Text file with reader (x, y) coordinates. If ``None``,
+        ``cfg.MRT_CENTERS_TXT`` is used.
+    ts_csv : str, optional
+        CSV with timestamps used to align RFID and video frames. If ``None``,
+        ``cfg.MRT_TS_CSV`` is used.
     shuffle : int, optional
         Training shuffle to use, by default ``1``.
     track_method : str, optional
@@ -51,6 +55,11 @@ def run_pipeline(
     output_video : str, optional
         Path of the final visualization video. If ``None``, a file named
         ``<video>_rfid_tracklets_overlay.mp4`` will be created in ``destfolder``.
+
+    Notes
+    -----
+    Default file paths for ``rfid_csv``, ``centers_txt``, and ``ts_csv`` are
+    defined in :mod:`rfid_tracking.config` (``config.py``).
 
     Returns
     -------
@@ -70,15 +79,15 @@ def run_pipeline(
     if not video_path.exists():
         raise FileNotFoundError(f"Video file not found: {video_path}")
 
-    rfid_csv = Path(rfid_csv)
+    rfid_csv = Path(rfid_csv) if rfid_csv is not None else Path(cfg.MRT_RFID_CSV)
     if not rfid_csv.exists():
         raise FileNotFoundError(f"RFID CSV file not found: {rfid_csv}")
 
-    centers_txt = Path(centers_txt)
+    centers_txt = Path(centers_txt) if centers_txt is not None else Path(cfg.MRT_CENTERS_TXT)
     if not centers_txt.exists():
         raise FileNotFoundError(f"Reader centers file not found: {centers_txt}")
 
-    ts_csv = Path(ts_csv)
+    ts_csv = Path(ts_csv) if ts_csv is not None else Path(cfg.MRT_TS_CSV)
     if not ts_csv.exists():
         raise FileNotFoundError(f"Timestamps CSV file not found: {ts_csv}")
 
