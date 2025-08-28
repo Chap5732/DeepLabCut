@@ -154,12 +154,17 @@ def run_pipeline(
 
     # 3) match RFID events to tracklets
     logger.info("Matching RFID events from %s to tracklets: %s", rfid_csv, track_pickle)
+    mrt_out_dir = (
+        dest / cfg.OUT_SUBDIR / "rfid_match_outputs"
+        if cfg.OUT_SUBDIR
+        else dest / "rfid_match_outputs"
+    )
     match_rfid_to_tracklets(
         pickle_path=str(track_pickle),
         rfid_csv=str(rfid_csv),
         centers_txt=str(centers_txt),
         ts_csv=str(ts_csv),
-        out_dir=None,
+        out_dir=str(mrt_out_dir),
     )
     logger.info("Finished matching RFID events for %s", track_pickle)
 

@@ -11,7 +11,7 @@ BASE_DIR = Path(__file__).resolve().parent
 # 路径可根据实际项目调整
 PICKLE_IN = None
 PICKLE_OUT = None  # None 表示覆盖输入
-OUT_SUBDIR = "CAP15"  # 输出子目录; 设为 None 则直接写入同级目录
+OUT_SUBDIR = "cap15"  # 输出子目录; 设为 None 则直接写入同级目录
 _dest = os.environ.get("DESTFOLDER")
 DESTFOLDER = Path(_dest) if _dest else None  # 中间结果输出目录; None 则使用视频所在目录
 
