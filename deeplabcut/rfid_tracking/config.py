@@ -11,6 +11,7 @@ BASE_DIR = Path(__file__).resolve().parent
 PICKLE_IN = None
 PICKLE_OUT = None  # None 表示覆盖输入
 OUT_SUBDIR = "CAP15"  # 输出子目录; 设为 None 则直接写入同级目录
+DESTFOLDER = None  # 中间结果输出目录; None 则使用视频所在目录
 
 VIDEO_PATH = PROJECT_ROOT / "deeplabcut/videos/test/demo.mp4"
 PICKLE_PATH = PICKLE_IN  # make_video 默认使用同一 pickle
