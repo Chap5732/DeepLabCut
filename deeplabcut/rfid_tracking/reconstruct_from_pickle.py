@@ -12,43 +12,24 @@
 """
 
 from __future__ import annotations
-from pathlib import Path
-from collections import defaultdict
-from typing import Dict, Tuple, List, Any
+
 import time
+from collections import defaultdict
+from pathlib import Path
+from typing import Any, Dict, List, Tuple
+
 import numpy as np
 import pandas as pd
 
+from .dlc_tools import body_center_from_arr, find_mouse_center_index, frame_idx_from_key
 from .io import load_tracklets_pickle, save_pickle_safely
-from .dlc_tools import frame_idx_from_key, find_mouse_center_index, body_center_from_arr
 
 try:  # 允许作为脚本或模块运行
-    from . import config
+    from . import config as cfg
 except ImportError:  # pragma: no cover
-    import config
+    import config as cfg
 
-# ================== 配置参数 ==================
-PICKLE_IN = config.PICKLE_IN
-PICKLE_OUT = config.PICKLE_OUT
-OUT_SUBDIR = config.OUT_SUBDIR
-
-FPS = config.FPS
-PX_PER_CM = config.PX_PER_CM
-V_GATE_CMS = config.V_GATE_CMS
-
-PCUTOFF = config.PCUTOFF
-HEAD_TAIL_SAMPLE = config.HEAD_TAIL_SAMPLE
-MAX_GAP_FRAMES = config.MAX_GAP_FRAMES
-ANCHOR_MIN_HITS = config.ANCHOR_MIN_HITS
-
-EPS_GAP = config.EPS_GAP
-DELTA_PX_CAP = config.DELTA_PX_CAP
-DELTA_PROP = config.DELTA_PROP
-
-STOP_NEAR_ANCHOR = config.STOP_NEAR_ANCHOR
-
-RESET_PREVIOUS = config.RESET_PREVIOUS
-LOG_RUN_METADATA = config.LOG_RUN_METADATA
+# Most tuning parameters live in config.py
 
 
 # ================== 工具函数 ==================
@@ -58,7 +39,12 @@ def _euclid(a, b) -> float:
     dx, dy = a[0] - b[0], a[1] - b[1]
     return float((dx * dx + dy * dy) ** 0.5)
 
-def _head_center(tk_centers: Dict[int, Tuple[float,float]], start_f: int, n: int = HEAD_TAIL_SAMPLE):
+
+def _head_center(
+    tk_centers: Dict[int, Tuple[float, float]],
+    start_f: int,
+    n: int = cfg.HEAD_TAIL_SAMPLE,
+):
     fs = sorted([f for f in tk_centers.keys() if f >= start_f])[:n]
     if not fs:
         return None
@@ -66,13 +52,19 @@ def _head_center(tk_centers: Dict[int, Tuple[float,float]], start_f: int, n: int
     ys = [tk_centers[f][1] for f in fs]
     return float(np.mean(xs)), float(np.mean(ys))
 
-def _tail_center(tk_centers: Dict[int, Tuple[float,float]], end_f: int, n: int = HEAD_TAIL_SAMPLE):
+
+def _tail_center(
+    tk_centers: Dict[int, Tuple[float, float]],
+    end_f: int,
+    n: int = cfg.HEAD_TAIL_SAMPLE,
+):
     fs = sorted([f for f in tk_centers.keys() if f <= end_f])[-n:]
     if not fs:
         return None
     xs = [tk_centers[f][0] for f in fs]
     ys = [tk_centers[f][1] for f in fs]
     return float(np.mean(xs)), float(np.mean(ys))
+
 
 def _safe_center_from_arr(arr: np.ndarray, mc_idx, pcutoff: float):
     """优先用 utils.body_center_from_arr；失败则回退到 p>=pcutoff 的关键点均值"""
@@ -91,6 +83,7 @@ def _safe_center_from_arr(arr: np.ndarray, mc_idx, pcutoff: float):
     except Exception:
         return None
     return None
+
 
 def summarize_tracklets(dd: Dict, pcutoff: float):
     """
@@ -116,7 +109,7 @@ def summarize_tracklets(dd: Dict, pcutoff: float):
             mc_idx = None  # 兜底
 
     tk_info: Dict[Any, Dict[str, Any]] = {}
-    tag_to_anchors: Dict[str, List[Tuple[int,int,Any]]] = defaultdict(list)
+    tag_to_anchors: Dict[str, List[Tuple[int, int, Any]]] = defaultdict(list)
 
     for tk, node in dd.items():
         if tk in ("header", "single"):
@@ -128,7 +121,14 @@ def summarize_tracklets(dd: Dict, pcutoff: float):
         fmin, fmax = None, None
 
         for fkey, arr in node.items():
-            if fkey in ("rfid_frames", "rfid_counts", "rfid_hint", "tag", "chain_tag", "chain_id"):
+            if fkey in (
+                "rfid_frames",
+                "rfid_counts",
+                "rfid_hint",
+                "tag",
+                "chain_tag",
+                "chain_id",
+            ):
                 continue
 
             # 解析帧号
@@ -163,12 +163,17 @@ def summarize_tracklets(dd: Dict, pcutoff: float):
 
         counts = node.get("rfid_counts", {}) or {}
         strength = int(counts.get(tg, 0)) if tg and isinstance(counts, dict) else 0
-        is_anchor = bool(tg) and (strength >= ANCHOR_MIN_HITS)
+        is_anchor = bool(tg) and (strength >= cfg.ANCHOR_MIN_HITS)
 
         tk_info[tk] = dict(
-            start=int(fmin), end=int(fmax), centers=centers,
-            head=head, tail=tail, tag=tg, anchor_strength=strength,
-            is_anchor=is_anchor
+            start=int(fmin),
+            end=int(fmax),
+            centers=centers,
+            head=head,
+            tail=tail,
+            tag=tg,
+            anchor_strength=strength,
+            is_anchor=is_anchor,
         )
 
         if is_anchor:
@@ -180,13 +185,19 @@ def summarize_tracklets(dd: Dict, pcutoff: float):
     ordered = sorted(tk_info.keys(), key=lambda t: tk_info[t]["start"])
     return tk_info, ordered, tag_to_anchors
 
-def _has_next_anchor_within(tag: str, seed_end: int, tag_to_anchors, max_gap: int) -> bool:
+
+def _has_next_anchor_within(
+    tag: str, seed_end: int, tag_to_anchors, max_gap: int
+) -> bool:
     for s, e, tk in tag_to_anchors.get(tag, []):
         if s > seed_end and (s - seed_end) <= max_gap:
             return True
     return False
 
-def _has_prev_anchor_within(tag: str, seed_start: int, tag_to_anchors, max_gap: int) -> bool:
+
+def _has_prev_anchor_within(
+    tag: str, seed_start: int, tag_to_anchors, max_gap: int
+) -> bool:
     for s, e, tk in reversed(tag_to_anchors.get(tag, [])):
         if e < seed_start and (seed_start - e) <= max_gap:
             return True
@@ -195,19 +206,21 @@ def _has_prev_anchor_within(tag: str, seed_start: int, tag_to_anchors, max_gap: 
 
 # ================== 时间–速度门控与同步推进 ==================
 def _v_gate_px_per_frame() -> float:
-    if FPS <= 0 or PX_PER_CM <= 0 or V_GATE_CMS <= 0:
+    if cfg.FPS <= 0 or cfg.PX_PER_CM <= 0 or cfg.V_GATE_CMS <= 0:
         raise ValueError("请正确设置 FPS、PX_PER_CM、V_GATE_CMS（均需>0）")
-    return float(V_GATE_CMS * (PX_PER_CM / FPS))
+    return float(cfg.V_GATE_CMS * (cfg.PX_PER_CM / cfg.FPS))
+
 
 def _delta_threshold_px(gap: int, v_gate_pxpf: float) -> float:
     # 歧义冻结阈值 δ：min(DELTA_PX_CAP, DELTA_PROP * (门控上限))
-    return float(min(DELTA_PX_CAP, DELTA_PROP * (v_gate_pxpf * max(1, gap))))
+    return float(min(cfg.DELTA_PX_CAP, cfg.DELTA_PROP * (v_gate_pxpf * max(1, gap))))
+
 
 def _collect_candidates(curr_tk, tk_info, assigned, direction: str, v_gate_pxpf: float):
     """
     收集 curr_tk 在指定方向上的、通过时间–速度门控的候选：
       - 仅非锚点、未被占用
-      - gap <= MAX_GAP_FRAMES, 且 d <= v_gate_pxpf * gap
+      - gap <= cfg.MAX_GAP_FRAMES, 且 d <= v_gate_pxpf * gap
     返回 [(cand_tk, d, gap, cost), ...] 按 cost 升序
     """
     info_c = tk_info[curr_tk]
@@ -215,19 +228,24 @@ def _collect_candidates(curr_tk, tk_info, assigned, direction: str, v_gate_pxpf:
     if direction == "forward":
         t_edge = info_c["end"]
         p_from = info_c["tail"]
+
         def ok(ti):
             g = ti["start"] - t_edge
-            return (g > 0) and (g <= MAX_GAP_FRAMES)
+            return (g > 0) and (g <= cfg.MAX_GAP_FRAMES)
+
         def dist_gap(ti):
             g = ti["start"] - t_edge
             d = _euclid(p_from, ti["head"])
             return d, g
+
     else:  # backward
         t_edge = info_c["start"]
         p_from = info_c["head"]
+
         def ok(ti):
             g = t_edge - ti["end"]
-            return (g > 0) and (g <= MAX_GAP_FRAMES)
+            return (g > 0) and (g <= cfg.MAX_GAP_FRAMES)
+
         def dist_gap(ti):
             g = t_edge - ti["end"]
             d = _euclid(ti["tail"], p_from)
@@ -241,31 +259,33 @@ def _collect_candidates(curr_tk, tk_info, assigned, direction: str, v_gate_pxpf:
             continue
         d, g = dist_gap(ti)
         if d <= v_gate_pxpf * g:
-            cost = d + EPS_GAP * g
+            cost = d + cfg.EPS_GAP * g
             pool.append((tk, d, g, cost))
 
     pool.sort(key=lambda x: x[3])  # cost 升序
     return pool
+
 
 def reconstruct_by_timespeed_gate(dd: Dict):
     """
     主流程：按“时间–速度门控 + 同步推进 + 贪心让步”进行链重建
     """
     v_gate_pxpf = _v_gate_px_per_frame()
-    tk_info, ordered, tag_to_anchors = summarize_tracklets(dd, PCUTOFF)
+    tk_info, ordered, tag_to_anchors = summarize_tracklets(dd, cfg.PCUTOFF)
 
     # 1) seeds -> chains & sources
     class Source:
-        __slots__ = ("chain_id","tag","direction","cur_tk","active","seed_tk")
-        def __init__(self, chain_id, tag, direction, cur_tk, seed_tk):
-            self.chain_id  = chain_id
-            self.tag       = tag
-            self.direction = direction  # "forward" or "backward"
-            self.cur_tk    = cur_tk
-            self.active    = True
-            self.seed_tk   = seed_tk
+        __slots__ = ("chain_id", "tag", "direction", "cur_tk", "active", "seed_tk")
 
-    seeds_all: List[Tuple[str,int,Any]] = []
+        def __init__(self, chain_id, tag, direction, cur_tk, seed_tk):
+            self.chain_id = chain_id
+            self.tag = tag
+            self.direction = direction  # "forward" or "backward"
+            self.cur_tk = cur_tk
+            self.active = True
+            self.seed_tk = seed_tk
+
+    seeds_all: List[Tuple[str, int, Any]] = []
     for tk in ordered:
         info = tk_info[tk]
         if info["is_anchor"]:
@@ -273,18 +293,18 @@ def reconstruct_by_timespeed_gate(dd: Dict):
     seeds_all.sort(key=lambda x: (x[0], x[1]))
 
     assigned: set = set()
-    chain_tracks: Dict[str, List[Any]] = {}     # chain_id -> ordered tk list
+    chain_tracks: Dict[str, List[Any]] = {}  # chain_id -> ordered tk list
     chain_meta: Dict[str, Dict[str, Any]] = {}  # {chain_id: {"tag":tag,"seeds":set()}}
     sources: List[Source] = []
     tag_chain_count = defaultdict(int)
 
-    def allow_dirs_for_seed(tag: str, seed_tk) -> Tuple[bool,bool]:
+    def allow_dirs_for_seed(tag: str, seed_tk) -> Tuple[bool, bool]:
         sstart, send = tk_info[seed_tk]["start"], tk_info[seed_tk]["end"]
         allow_f = allow_b = True
-        if STOP_NEAR_ANCHOR:
-            if _has_next_anchor_within(tag, send, tag_to_anchors, MAX_GAP_FRAMES):
+        if cfg.STOP_NEAR_ANCHOR:
+            if _has_next_anchor_within(tag, send, tag_to_anchors, cfg.MAX_GAP_FRAMES):
                 allow_f = False
-            if _has_prev_anchor_within(tag, sstart, tag_to_anchors, MAX_GAP_FRAMES):
+            if _has_prev_anchor_within(tag, sstart, tag_to_anchors, cfg.MAX_GAP_FRAMES):
                 allow_b = False
         return allow_f, allow_b
 
@@ -306,32 +326,36 @@ def reconstruct_by_timespeed_gate(dd: Dict):
     round_idx = 0
     while True:
         round_idx += 1
-        active_sources = [i for i,s in enumerate(sources) if s.active]
+        active_sources = [i for i, s in enumerate(sources) if s.active]
         if not active_sources:
             break
 
-        proposals_by_cand = defaultdict(list)  # cand_tk -> list of {source_idx,cost,gap,has_alt}
+        proposals_by_cand = defaultdict(
+            list
+        )  # cand_tk -> list of {source_idx,cost,gap,has_alt}
         source_candidates_cache = {}
 
         # 每个 source 提名其 top1 候选（保留是否有替代）
         for si in active_sources:
             s = sources[si]
-            pool = _collect_candidates(s.cur_tk, tk_info, assigned, s.direction, v_gate_pxpf)
+            pool = _collect_candidates(
+                s.cur_tk, tk_info, assigned, s.direction, v_gate_pxpf
+            )
             source_candidates_cache[si] = pool
             if not pool:
                 s.active = False
                 continue
             cand_tk, d, g, cost = pool[0]
-            has_alt = (len(pool) > 1)
-            proposals_by_cand[cand_tk].append({
-                "source_idx": si, "cost": cost, "gap": g, "has_alt": has_alt
-            })
+            has_alt = len(pool) > 1
+            proposals_by_cand[cand_tk].append(
+                {"source_idx": si, "cost": cost, "gap": g, "has_alt": has_alt}
+            )
 
         if not proposals_by_cand:
             break
 
         # 3) 冲突裁决（A 方案增强版）
-        assignments = {}        # source_idx -> cand_tk
+        assignments = {}  # source_idx -> cand_tk
         used_sources = set()
         used_candidates = set()
 
@@ -345,7 +369,11 @@ def reconstruct_by_timespeed_gate(dd: Dict):
         for _, cand_tk in cand_order:
             if cand_tk in used_candidates:
                 continue
-            lst = [x for x in proposals_by_cand[cand_tk] if x["source_idx"] not in used_sources]
+            lst = [
+                x
+                for x in proposals_by_cand[cand_tk]
+                if x["source_idx"] not in used_sources
+            ]
             if not lst:
                 continue
             lst.sort(key=lambda x: x["cost"])
@@ -393,14 +421,16 @@ def reconstruct_by_timespeed_gate(dd: Dict):
             node = dd[tk]
             if isinstance(node, dict):  # 仅对 dict 节点写回链字段
                 node["chain_tag"] = tag
-                node["chain_id"]  = chain_id
-                node["chain_origin"] = ("anchor" if tk in seeds_set else "propagated")
+                node["chain_id"] = chain_id
+                node["chain_origin"] = "anchor" if tk in seeds_set else "propagated"
                 dd[tk] = node
 
             info = tk_info[tk]
             chain_rows.append([chain_id, tag, tk, info["start"], info["end"]])
 
-    df = pd.DataFrame(chain_rows, columns=["chain_id","chain_tag","tracklet","start","end"])
+    df = pd.DataFrame(
+        chain_rows, columns=["chain_id", "chain_tag", "tracklet", "start", "end"]
+    )
     return dd, df
 
 
@@ -411,10 +441,10 @@ def main(
     pickle_out: str | None = None,
     out_subdir: str | None = None,
 ) -> None:
-    p_in = Path(pickle_in or PICKLE_IN)
+    p_in = Path(pickle_in or cfg.PICKLE_IN)
     # Use the configured subdirectory only when explicitly requested;
     # passing ``None`` keeps outputs alongside the input pickle.
-    out_subdir = OUT_SUBDIR if out_subdir is not None else None
+    out_subdir = cfg.OUT_SUBDIR if out_subdir is not None else None
     p_out = p_in if pickle_out is None else Path(pickle_out)
     if out_subdir:
         out_dir = p_in.parent / out_subdir
@@ -427,7 +457,7 @@ def main(
     if str(p_in).endswith(".json"):
         print(f"错误：PICKLE_IN 指向 JSON 而非 .pickle：{p_in}")
         return
-    if FPS <= 0 or PX_PER_CM <= 0 or V_GATE_CMS <= 0:
+    if cfg.FPS <= 0 or cfg.PX_PER_CM <= 0 or cfg.V_GATE_CMS <= 0:
         print("错误：请正确设置 FPS、PX_PER_CM、V_GATE_CMS（均需>0）")
         return
 
@@ -435,26 +465,34 @@ def main(
     dd = load_tracklets_pickle(str(p_in))
 
     # —— 可重复运行：清理旧链字段 ——
-    if RESET_PREVIOUS:
+    if cfg.RESET_PREVIOUS:
         cleared = 0
         for tk, node in dd.items():
             if tk in ("header", "single"):
                 continue
             if isinstance(node, dict):
-                for k in ("chain_tag", "chain_id", "chain_origin", "chain_tag_conflict"):
+                for k in (
+                    "chain_tag",
+                    "chain_id",
+                    "chain_origin",
+                    "chain_tag_conflict",
+                ):
                     if k in node:
                         node.pop(k, None)
                         cleared += 1
         print(f"[reset] 清理旧链字段完成（条目计数≈{cleared}）")
 
     # —— 记录本次运行参数（安全写法：不修改非 dict 的 header） ——
-    if LOG_RUN_METADATA:
+    if cfg.LOG_RUN_METADATA:
         meta = {
             "ts": time.strftime("%Y-%m-%d %H:%M:%S"),
             "method": "time-speed gate=80cm/s + wavefront + greedy",
-            "fps": FPS, "px_per_cm": PX_PER_CM, "v_gate_cmps": V_GATE_CMS,
-            "max_gap": MAX_GAP_FRAMES, "eps_gap": EPS_GAP,
-            "stop_near_anchor": STOP_NEAR_ANCHOR,
+            "fps": cfg.FPS,
+            "px_per_cm": cfg.PX_PER_CM,
+            "v_gate_cmps": cfg.V_GATE_CMS,
+            "max_gap": cfg.MAX_GAP_FRAMES,
+            "eps_gap": cfg.EPS_GAP,
+            "stop_near_anchor": cfg.STOP_NEAR_ANCHOR,
         }
         hdr = dd.get("header", None)
         if isinstance(hdr, dict):
@@ -480,6 +518,7 @@ def main(
     save_pickle_safely(dd2, p_out)
     print(f"[OK] pickle 文件已更新: {p_out}")
     print(f"重建完成：共生成 {len(df_chains)} 条链段记录")
+
 
 if __name__ == "__main__":
     main()
