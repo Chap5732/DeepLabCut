@@ -1,6 +1,22 @@
-# RFID DLC 追踪项目
+# DeepLabCut 扩展追踪分支（RFID DLC 追踪项目）
 
-这是一个基于DeepLabCut和RFID技术的动物行为追踪分析项目，用于重建动物移动轨迹并生成可视化视频。
+![Arena tracking cover](../../docs/images/arena_tracking_image.png)
+
+本分支在官方 [DeepLabCut](https://github.com/DeepLabCut/DeepLabCut) 基础上扩展了追踪能力，主要包含：
+
+- **速度门控椭圆追踪器**：通过速度与空间的双重门控预测并拒绝不合理匹配，在动物快速移动或交叉时仍能保持身份稳定。
+- **RFID 辅助的长期追踪**：在场地周围布设读卡器周期性校正身份，即便长时间遮挡也能维持准确追踪。
+
+所有功能与标准 DeepLabCut 项目和 API 兼容，更多使用教程可参见官方文档。
+
+## 安装与环境准备
+
+```bash
+git clone https://github.com/Chap5732/DeepLabCut.git
+cd DeepLabCut
+git checkout feat/velocity-gating
+pip install -e .
+```
 
 ## 快速开始
 
@@ -75,6 +91,44 @@ project/
 - **DLC处理**：帧索引提取、身体中心计算
 - **可视化**：颜色生成、读卡器绘制、ROI绘制
 - **几何计算**：ROI命中测试、距离计算
+
+## 标签分配与轨迹重建原理
+
+### 标签分配原理
+`match_rfid_to_tracklets.py` 模块负责将读卡器逐次捕获到的标签分配给对应 tracklet。核心流程如下：
+
+1. **时空匹配**  
+   - 每条 RFID 记录首先根据 `MRT_RFID_FRAME_RANGE` 对齐到最近的视频帧；只有在这一帧及其前后给定帧数内出现的 tracklet 才会被考虑。  
+   - 以读卡器的几何中心为圆心，搜索半径为 `MRT_COIL_DIAMETER_PX / 2 + MRT_HIT_MARGIN` 的范围；候选轨迹需在圆内至少命中一次。
+
+2. **候选筛选**  
+   - 轨迹末端关键点的 `p` 值必须高于 `MRT_PCUTOFF`；  
+   - 若启用 `MRT_UNIQUE_NEIGHBOR_ONLY`，要求在该半径内只有唯一 tracklet；否则会比较最邻近的两个候选，若距离差小于 `MRT_AMBIG_MARGIN_PX` 则判为歧义。
+
+3. **标签确认**  
+   - 为每条 tracklet 统计各标签的命中次数，要求命中总数 ≥ `MRT_TAG_MIN_READS` 且主标签占比 ≥ `MRT_TAG_DOMINANT_RATIO`。  
+   - 对于低命中但高纯度的情况，可通过 `MRT_LOW_READS_HIGH_PURITY_ASSIGN` 与 `MRT_LOW_READS_PURITY_THRESHOLD` 进行宽松分配。  
+   - 最终把确认的标签写入节点的 `tag` 字段，同时记录 `rfid_counts` 和具体命中帧。
+
+### 轨迹重建原理
+`reconstruct_from_pickle.py` 以带标签的 tracklet 作为锚点，在整个时间轴上同步推进，构建连续的身份链：
+
+1. **锚点筛选**  
+   - 只有标签命中次数 ≥ `ANCHOR_MIN_HITS` 的 tracklet 才被视为可靠锚点；它们按照起始时间排序并作为“水源”同时向两侧扩散。
+
+2. **时间–速度门控**  
+   - 为每个活跃锚点计算其波前位置（头/尾中心）；仅在时间间隔 `≤ MAX_GAP_FRAMES` 且位移 `d ≤ V_GATE_CMS × gap / (FPS / PX_PER_CM)` 的候选 tracklet 才会被纳入候选池。  
+   - 候选的代价定义为 `d + EPS_GAP × gap`，越小越优先。
+
+3. **同步推进与冲突裁决**  
+   - 所有锚点同时提名各自代价最低的候选，如果同一个 tracklet 被多个锚点竞争，则按代价从小到大依次决策。  
+   - 若最佳与次佳代价之差小于 `δ = min(DELTA_PX_CAP, DELTA_PROP × 上限位移)`，则判为歧义并冻结该候选，等待下一轮。  
+   - 被选中的轨迹加入对应身份链，源锚点的波前移动到新轨迹末端；若某方向候选耗尽，则该波前终止。
+
+4. **近锚点堤坝**  
+   - 若同一标签在传播方向的 `MAX_GAP_FRAMES` 内已存在另一个锚点，则当前锚点不再越界扩张，以避免跨越可靠锚点造成错误连接。
+
+经过多轮推进后，所有波前都停止，最终得到多条无冲突的身份链，可用于后续可视化或行为分析。
 
 ## 使用方法
 
@@ -180,13 +234,9 @@ python scripts/run_make_video.py video.mp4 reconstructed.pickle readers_centers.
 - `rfid_tracklets_overlay.mp4`：可视化视频
 
 ## 示例脚本
-`scripts/` 目录中的脚本均已支持命令行参数，可作为最小示例直接运行：
+`scripts/` 目录中的脚本均已支持命令行参数，可作为最小示例直接运行（完整流程示例见前文“快速开始”）：
 
 ```bash
-# 运行完整流程（支持 --out-subdir）
-python scripts/run_full_pipeline.py config.yaml video.mp4 rfid.csv \
-    readers_centers.txt timestamps.csv --destfolder outputs --out-subdir session1
-
 # 单独执行各步骤
 python scripts/run_match_rfid.py tracklets.pickle rfid.csv readers_centers.txt \
     timestamps.csv --out-dir rfid_match_outputs
@@ -267,14 +317,7 @@ DRAW_READERS: false
 ```
 
 在命令行运行全流程时，可使用 `--destfolder` 覆盖 `config.DESTFOLDER`，
-并通过 `--config_override` 传入该 YAML：
-
-```bash
-python run_pipeline.py config.yaml video.mp4 rfid.csv centers.txt ts.csv \
-    --destfolder ./outputs \
-    --config_override my_config.yaml \
-    --mrt_coil_diameter_px 120
-```
+并通过 `--config_override` 传入该 YAML（示例命令见前文）。
 
 ## 数据格式
 
