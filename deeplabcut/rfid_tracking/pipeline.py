@@ -8,7 +8,8 @@ from . import config as cfg
 from .make_video import main as make_video
 from .match_rfid_to_tracklets import main as match_rfid_to_tracklets
 from .reconstruct_from_pickle import main as reconstruct_from_pickle
-from .reconstruct_from_pickle import OUT_SUBDIR as RECON_OUT_SUBDIR
+
+RECON_OUT_SUBDIR = cfg.OUT_SUBDIR
 
 logger = logging.getLogger(__name__)
 
@@ -145,9 +146,9 @@ def run_pipeline(
     logger.info("Finished converting detections to tracklets for %s", video_path)
 
     # Locate the generated tracklet pickle
-    cfg = aux.read_config(config_path)
-    train_fraction = cfg["TrainingFraction"][trainingsetindex]
-    dlc_scorer = get_scorer_name(cfg, shuffle, train_fraction)[0]
+    dlc_cfg = aux.read_config(config_path)
+    train_fraction = dlc_cfg["TrainingFraction"][trainingsetindex]
+    dlc_scorer = get_scorer_name(dlc_cfg, shuffle, train_fraction)[0]
     method_suffix = {"ellipse": "el", "box": "bx"}.get(track_method, "sk")
     track_pickle = dest / f"{video_path.stem}{dlc_scorer}_{method_suffix}.pickle"
 
