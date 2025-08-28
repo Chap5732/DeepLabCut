@@ -1,6 +1,6 @@
 # DeepLabCut Extended Tracking Branch
 
-![Arena tracking cover](docs/images/arena_tracking_cover.jpg)
+![Arena tracking cover](docs/images/arena_tracking_image.png)
 
 This branch builds on the upstream [DeepLabCut](https://github.com/DeepLabCut/DeepLabCut) project to explore enhanced tracking capabilities.
 
