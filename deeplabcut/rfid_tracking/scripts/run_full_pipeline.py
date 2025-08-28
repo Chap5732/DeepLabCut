@@ -11,6 +11,7 @@ RFID_CSV = "/data/myproject/rfid_events.csv"
 CENTERS_TXT = "/data/myproject/readers_centers.txt"
 TS_CSV = "/data/myproject/timestamps.csv"
 DESTFOLDER = cfg.DESTFOLDER  # Optional output dir; overrides ``config.DESTFOLDER``
+MRT_COIL_DIAMETER_PX = cfg.MRT_COIL_DIAMETER_PX  # Override coil diameter if needed
 
 
 def main() -> None:
@@ -22,6 +23,7 @@ def main() -> None:
         centers_txt=CENTERS_TXT,
         ts_csv=TS_CSV,
         destfolder=DESTFOLDER,
+        mrt_coil_diameter_px=MRT_COIL_DIAMETER_PX,
     )
 
 

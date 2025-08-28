@@ -74,7 +74,8 @@ run_rfid_pipeline(
 ```
 
 如果在 `config.py` 中设置了 ``DESTFOLDER``，命令行运行 `run_pipeline.py`
-时可通过 `--destfolder` 参数覆盖该默认目录。
+时可通过 `--destfolder` 参数覆盖该默认目录；`--mrt_coil_diameter_px`
+可临时设置线圈直径（像素）。
 
 该函数依次调用：
 
@@ -101,6 +102,7 @@ python convert_detection2tracklets.py --config-path <项目config.yaml> --video-
 # 在 config.py 中设置 MRT_* 路径或提供 YAML 覆盖
 python match_rfid_to_tracklets.py                # 使用 config.py 中的默认值
 python match_rfid_to_tracklets.py --config my_mrt.yaml  # 读取外部 YAML
+python match_rfid_to_tracklets.py --mrt_coil_diameter_px 120  # 临时覆盖线圈直径
 ```
 
 示例 YAML (`my_mrt.yaml`):
@@ -173,6 +175,7 @@ python scripts/run_make_video.py       # 生成可视化视频
 ### match_rfid_to_tracklets 参数
 - `MRT_PICKLE_PATH` / `MRT_RFID_CSV` / `MRT_CENTERS_TXT` / `MRT_TS_CSV` / `MRT_OUT_DIR`
 - `MRT_HIT_RADIUS_PX`、`MRT_AMBIG_MARGIN_PX`、`MRT_TAG_CONFIDENCE_THRESHOLD` 等匹配门槛
+- `MRT_COIL_DIAMETER_PX`：线圈直径（像素）；命令行 `run_pipeline.py` 和 `match_rfid_to_tracklets.py` 可通过 `--mrt_coil_diameter_px` 覆盖
 
 这些参数可直接在 `config.py` 中修改，或写入 YAML 后通过
 `python match_rfid_to_tracklets.py --config my_mrt.yaml` 加载。
@@ -220,7 +223,8 @@ DRAW_READERS: false
 ```bash
 python run_pipeline.py config.yaml video.mp4 rfid.csv centers.txt ts.csv \
     --destfolder ./outputs \
-    --config_override my_config.yaml
+    --config_override my_config.yaml \
+    --mrt_coil_diameter_px 120
 ```
 
 ## 数据格式

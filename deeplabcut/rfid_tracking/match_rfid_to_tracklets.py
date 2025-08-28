@@ -457,9 +457,12 @@ def main(
     ts_csv: str | None = None,
     out_dir: str | None = None,
     config_path: str | None = None,
+    mrt_coil_diameter_px: float | None = None,
 ) -> None:
     if config_path:
         cfg.load_mrt_config(config_path)
+    if mrt_coil_diameter_px is not None:
+        cfg.MRT_COIL_DIAMETER_PX = mrt_coil_diameter_px
     refresh_from_config()
 
     pickle_path = pickle_path or PICKLE_PATH
@@ -862,5 +865,11 @@ if __name__ == "__main__":
     parser.add_argument("--ts", dest="ts_csv", default=None, help="Timestamps CSV file")
     parser.add_argument(
         "--out_dir", dest="out_dir", default=None, help="Directory for output files"
+    )
+    parser.add_argument(
+        "--mrt_coil_diameter_px",
+        type=float,
+        default=None,
+        help="RFID coil diameter in pixels; overrides MRT_COIL_DIAMETER_PX",
     )
     main(**vars(parser.parse_args()))

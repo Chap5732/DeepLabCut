@@ -42,8 +42,18 @@ def main() -> None:
         default=None,
         help="YAML file to override rfid_tracking.config settings",
     )
+    parser.add_argument(
+        "--mrt_coil_diameter_px",
+        type=float,
+        default=None,
+        help="RFID coil diameter in pixels; overrides cfg.MRT_COIL_DIAMETER_PX",
+    )
     args = parser.parse_args()
-    run_pipeline(**vars(args))
+    if args.mrt_coil_diameter_px is not None:
+        cfg.MRT_COIL_DIAMETER_PX = args.mrt_coil_diameter_px
+    params = vars(args)
+    params.pop("mrt_coil_diameter_px", None)
+    run_pipeline(**params)
 
 
 if __name__ == "__main__":
