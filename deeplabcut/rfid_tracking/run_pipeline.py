@@ -1,6 +1,11 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
-"""Command-line wrapper to run the full RFID tracking pipeline."""
+"""Command-line wrapper to run the full RFID tracking pipeline.
+
+The script assumes that the DeepLabCut model was trained with ``shuffle=1`` by
+default. If your model used a different shuffle index, pass it explicitly using
+the ``--shuffle`` argument (and ``--trainingsetindex`` when needed).
+"""
 
 import argparse
 import logging
@@ -22,7 +27,12 @@ def main() -> None:
     parser.add_argument("rfid_csv", help="RFID event CSV")
     parser.add_argument("centers_txt", help="Reader centers text file")
     parser.add_argument("ts_csv", help="Timestamps CSV for alignment")
-    parser.add_argument("--shuffle", type=int, default=1, help="DLC shuffle index")
+    parser.add_argument(
+        "--shuffle",
+        type=int,
+        default=1,
+        help="DLC shuffle index used during training (default: 1)",
+    )
     parser.add_argument(
         "--track_method", default="ellipse", help="Tracklet matching method"
     )
