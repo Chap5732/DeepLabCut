@@ -2,25 +2,6 @@
 
 这是一个基于DeepLabCut和RFID技术的动物行为追踪分析项目，用于重建动物移动轨迹并生成可视化视频。
 
-## 快速开始
-
-仓库自带了一套简短的示例数据（DLC 模型、视频、RFID 记录等），解压后可直接体验全流程：
-
-```bash
-python scripts/run_full_pipeline.py demo/config.yaml demo/video.mp4 demo/rfid.csv \
-    demo/readers_centers.txt demo/timestamps.csv --shuffle 1 --out-subdir demo_output
-```
-
-要在自己的数据上运行，只需将上述路径替换为实际文件位置；命令默认会在输出目录下创建可视化视频。
-该脚本默认使用 DeepLabCut 模型的 ``shuffle=1``。如果训练时使用了其他
-shuffle 编号，可通过 ``--shuffle`` 参数显式指定（必要时也要设置
-``--trainingsetindex``）。例如：
-
-```bash
-python scripts/run_full_pipeline.py config.yaml video.mp4 rfid.csv \
-    readers_centers.txt timestamps.csv --shuffle 2 --out-subdir output2
-```
-
 ## 项目结构
 
 ```
