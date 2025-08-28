@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import os
 from pathlib import Path
 
 PROJECT_ROOT = Path("/ssd01/user_acc_data/oppa")
@@ -10,8 +11,9 @@ BASE_DIR = Path(__file__).resolve().parent
 # 路径可根据实际项目调整
 PICKLE_IN = None
 PICKLE_OUT = None  # None 表示覆盖输入
-OUT_SUBDIR = "CAP15"  # 输出子目录; 设为 None 则直接写入同级目录
-DESTFOLDER = None  # 中间结果输出目录; None 则使用视频所在目录
+OUT_SUBDIR = "cap15"  # 输出子目录; 设为 None 则直接写入同级目录
+_dest = os.environ.get("DESTFOLDER")
+DESTFOLDER = Path(_dest) if _dest else None  # 中间结果输出目录; None 则使用视频所在目录
 
 VIDEO_PATH = PROJECT_ROOT / "deeplabcut/videos/test/demo.mp4"
 PICKLE_PATH = PICKLE_IN  # make_video 默认使用同一 pickle
@@ -71,11 +73,10 @@ MRT_PICKLE_PATH = PICKLE_IN
 MRT_RFID_CSV = PROJECT_ROOT / "analysis/data/jc0813/rfid_data_20250813_055827.csv"
 MRT_CENTERS_TXT = CENTERS_TXT
 MRT_TS_CSV = PROJECT_ROOT / "analysis/data/jc0813/record_20250813_053913_timestamps.csv"
-_mrt_base = PROJECT_ROOT / "analysis/data/jc0813"
 MRT_OUT_DIR = (
-    _mrt_base / OUT_SUBDIR / "rfid_match_outputs"
-    if OUT_SUBDIR
-    else _mrt_base / "rfid_match_outputs"
+    DESTFOLDER / OUT_SUBDIR / "rfid_match_outputs"
+    if DESTFOLDER and OUT_SUBDIR
+    else (DESTFOLDER / "rfid_match_outputs" if DESTFOLDER else None)
 )
 
 MRT_N_ROWS = 12
