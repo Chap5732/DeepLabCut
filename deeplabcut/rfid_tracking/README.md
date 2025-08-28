@@ -112,12 +112,14 @@ run_rfid_pipeline(
 如果在 `config.py` 中设置了 ``DESTFOLDER``，命令行运行 `run_pipeline.py`
 时可通过 `--destfolder` 参数覆盖该默认目录；使用 `--out-subdir` 可
 指定在目标目录下创建子目录，省略该参数则结果直接写入目标目录。
+脚本默认使用 DeepLabCut 模型的 ``shuffle=1``，若训练时使用其他
+shuffle 编号，请通过 ``--shuffle`` 指定（必要时 ``--trainingsetindex``）。
 `--mrt_coil_diameter_px` 可临时设置线圈直径（像素）。
 
 示例命令行：
 ```bash
 python run_pipeline.py config.yaml video.mp4 rfid.csv centers.txt ts.csv \
-    --destfolder path/to/output --out-subdir session1
+    --destfolder path/to/output --shuffle 2 --out-subdir session1
 ```
 
 该函数依次调用：
