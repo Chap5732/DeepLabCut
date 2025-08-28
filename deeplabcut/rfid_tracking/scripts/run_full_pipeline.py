@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 """Run the entire RFID tracking pipeline with preset paths."""
 
+from deeplabcut.rfid_tracking import config as cfg
 from deeplabcut.rfid_tracking.pipeline import run_pipeline
 
 # Update these paths to match your environment
@@ -9,6 +10,7 @@ VIDEO_PATH = "/data/myproject/video.mp4"
 RFID_CSV = "/data/myproject/rfid_events.csv"
 CENTERS_TXT = "/data/myproject/readers_centers.txt"
 TS_CSV = "/data/myproject/timestamps.csv"
+DESTFOLDER = cfg.DESTFOLDER  # Optional output dir; overrides ``config.DESTFOLDER``
 
 
 def main() -> None:
@@ -19,6 +21,7 @@ def main() -> None:
         rfid_csv=RFID_CSV,
         centers_txt=CENTERS_TXT,
         ts_csv=TS_CSV,
+        destfolder=DESTFOLDER,
     )
 
 

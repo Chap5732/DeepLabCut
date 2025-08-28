@@ -69,9 +69,12 @@ run_rfid_pipeline(
     rfid_csv="path/to/rfid.csv",
     centers_txt="path/to/readers_centers.txt",
     ts_csv="path/to/timestamps.csv",
-    destfolder="path/to/output"  # 可选
+    destfolder="path/to/output"  # 可选；若省略则使用 ``config.DESTFOLDER``
 )
 ```
+
+如果在 `config.py` 中设置了 ``DESTFOLDER``，命令行运行 `run_pipeline.py`
+时可通过 `--destfolder` 参数覆盖该默认目录。
 
 该函数依次调用：
 
@@ -150,6 +153,7 @@ python scripts/run_make_video.py       # 生成可视化视频
 - `VIDEO_PATH` / `OUTPUT_VIDEO`：原始视频与生成视频路径
 - `CENTERS_TXT`：读卡器中心文件
 - `ROI_FILE`：ROI 区域定义文件
+- `DESTFOLDER`：中间结果输出目录（命令行参数会覆盖）
 
 ### 门控与重建参数
 - `FPS`：相机帧率
@@ -183,6 +187,7 @@ python scripts/run_make_video.py       # 生成可视化视频
 - `PICKLE_IN` / `PICKLE_OUT`
 - `VIDEO_PATH` / `OUTPUT_VIDEO`
 - `CENTERS_TXT` / `ROI_FILE`
+- `DESTFOLDER`
 
 #### `MRT_*` 参数
 - `MRT_RFID_CSV` / `MRT_TS_CSV` / `MRT_CENTERS_TXT` / `MRT_PICKLE_PATH`
@@ -199,6 +204,7 @@ python scripts/run_make_video.py       # 生成可视化视频
 # 路径
 PICKLE_IN: /path/to/tracklets.pickle
 CENTERS_TXT: /path/to/readers_centers.txt
+DESTFOLDER: ./outputs
 
 # MRT 参数
 MRT_RFID_CSV: /path/to/rfid.csv
@@ -208,10 +214,12 @@ SHOW_CHAIN: true
 DRAW_READERS: false
 ```
 
-在命令行运行全流程时，可使用 `--config_override` 传入该 YAML：
+在命令行运行全流程时，可使用 `--destfolder` 覆盖 `config.DESTFOLDER`，
+并通过 `--config_override` 传入该 YAML：
 
 ```bash
 python run_pipeline.py config.yaml video.mp4 rfid.csv centers.txt ts.csv \
+    --destfolder ./outputs \
     --config_override my_config.yaml
 ```
 

@@ -1,16 +1,14 @@
 from __future__ import annotations
 
+import logging
 from pathlib import Path
 from typing import Optional
-import logging
 
 from . import config as cfg
 from .make_video import main as make_video
 from .match_rfid_to_tracklets import main as match_rfid_to_tracklets
-from .reconstruct_from_pickle import (
-    main as reconstruct_from_pickle,
-    OUT_SUBDIR as RECON_OUT_SUBDIR,
-)
+from .reconstruct_from_pickle import main as reconstruct_from_pickle
+from .reconstruct_from_pickle import OUT_SUBDIR as RECON_OUT_SUBDIR
 
 logger = logging.getLogger(__name__)
 
@@ -23,7 +21,7 @@ def run_pipeline(
     ts_csv: Optional[str] = None,
     shuffle: int = 1,
     track_method: str = "ellipse",
-    destfolder: Optional[str] = None,
+    destfolder: Optional[str] = cfg.DESTFOLDER,
     trainingsetindex: int = 0,
     output_video: Optional[str] = None,
     config_override: str | Path | None = None,
@@ -50,7 +48,8 @@ def run_pipeline(
     track_method : str, optional
         Tracklet matching method ("ellipse", "skeleton", or "box").
     destfolder : str, optional
-        Directory for intermediate outputs. If ``None``, uses the video folder.
+        Directory for intermediate outputs. Defaults to ``cfg.DESTFOLDER``;
+        if ``None``, uses the video folder.
     trainingsetindex : int, optional
         Training set index used for the DLC model, by default ``0``.
     output_video : str, optional
@@ -89,7 +88,9 @@ def run_pipeline(
     if not rfid_csv.exists():
         raise FileNotFoundError(f"RFID CSV file not found: {rfid_csv}")
 
-    centers_txt = Path(centers_txt) if centers_txt is not None else Path(cfg.MRT_CENTERS_TXT)
+    centers_txt = (
+        Path(centers_txt) if centers_txt is not None else Path(cfg.MRT_CENTERS_TXT)
+    )
     if not centers_txt.exists():
         raise FileNotFoundError(f"Reader centers file not found: {centers_txt}")
 
@@ -151,9 +152,7 @@ def run_pipeline(
     track_pickle = dest / f"{video_path.stem}{dlc_scorer}_{method_suffix}.pickle"
 
     # 3) match RFID events to tracklets
-    logger.info(
-        "Matching RFID events from %s to tracklets: %s", rfid_csv, track_pickle
-    )
+    logger.info("Matching RFID events from %s to tracklets: %s", rfid_csv, track_pickle)
     match_rfid_to_tracklets(
         pickle_path=str(track_pickle),
         rfid_csv=str(rfid_csv),

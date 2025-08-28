@@ -6,8 +6,10 @@ import argparse
 import logging
 
 try:  # allow running as script or module
+    from . import config as cfg
     from .pipeline import run_pipeline
 except ImportError:  # pragma: no cover
+    import config as cfg
     from pipeline import run_pipeline
 
 
@@ -21,10 +23,20 @@ def main() -> None:
     parser.add_argument("centers_txt", help="Reader centers text file")
     parser.add_argument("ts_csv", help="Timestamps CSV for alignment")
     parser.add_argument("--shuffle", type=int, default=1, help="DLC shuffle index")
-    parser.add_argument("--track_method", default="ellipse", help="Tracklet matching method")
-    parser.add_argument("--destfolder", default=None, help="Output directory for intermediates")
-    parser.add_argument("--trainingsetindex", type=int, default=0, help="DLC training set index")
-    parser.add_argument("--output_video", default=None, help="Path for final overlay video")
+    parser.add_argument(
+        "--track_method", default="ellipse", help="Tracklet matching method"
+    )
+    parser.add_argument(
+        "--destfolder",
+        default=cfg.DESTFOLDER,
+        help="Output directory for intermediates",
+    )
+    parser.add_argument(
+        "--trainingsetindex", type=int, default=0, help="DLC training set index"
+    )
+    parser.add_argument(
+        "--output_video", default=None, help="Path for final overlay video"
+    )
     parser.add_argument(
         "--config_override",
         default=None,
