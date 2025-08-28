@@ -153,6 +153,48 @@ python make_video.py
 这些参数可直接在 `config.py` 中修改，或写入 YAML 后通过
 `python match_rfid_to_tracklets.py --config my_mrt.yaml` 加载。
 
+### YAML 配置覆盖 (`load_config`)
+
+通过新提供的 `load_config` 函数，可以在单独的 YAML 文件中定义配置，
+运行流程前加载该文件即可覆盖 `config.py` 中的任何变量。YAML 中的键
+需与变量名一致。
+
+#### 路径相关
+- `PICKLE_IN` / `PICKLE_OUT`
+- `VIDEO_PATH` / `OUTPUT_VIDEO`
+- `CENTERS_TXT` / `ROI_FILE`
+
+#### `MRT_*` 参数
+- `MRT_RFID_CSV` / `MRT_TS_CSV` / `MRT_CENTERS_TXT` / `MRT_PICKLE_PATH`
+- 以及所有其他 `MRT_` 前缀的匹配与门控参数
+
+#### 可视化开关
+- `SHOW_CHAIN` / `CHAIN_FALLBACK_ID`
+- `DRAW_READERS` / `DRAW_ROIS`
+- `MAX_FRAMES` 等
+
+示例 YAML:
+
+```yaml
+# 路径
+PICKLE_IN: /path/to/tracklets.pickle
+CENTERS_TXT: /path/to/readers_centers.txt
+
+# MRT 参数
+MRT_RFID_CSV: /path/to/rfid.csv
+
+# 可视化
+SHOW_CHAIN: true
+DRAW_READERS: false
+```
+
+在命令行运行全流程时，可使用 `--config_override` 传入该 YAML：
+
+```bash
+python run_pipeline.py config.yaml video.mp4 rfid.csv centers.txt ts.csv \
+    --config_override my_config.yaml
+```
+
 ## 数据格式
 
 ### ROI定义文件 (JSON)
