@@ -2,29 +2,35 @@ from __future__ import annotations
 
 from pathlib import Path
 
+PROJECT_ROOT = Path("/ssd01/user_acc_data/oppa")
 # Base directory for RFID tracking scripts
 BASE_DIR = Path(__file__).resolve().parent
 
 # ================== 默认路径 ==================
 # 路径可根据实际项目调整
-PICKLE_IN = "/ssd01/user_acc_data/oppa/deeplabcut/projects/MiceTrackerFor20-Oppa-2024-12-08/analyze_videos/shuffle3/demo1/velocity_gating/demoDLC_HrnetW32_MiceTrackerFor20Dec8shuffle3_detector_best-250_snapshot_best-190_el.pickle"
-PICKLE_OUT = None            # None 表示覆盖输入
-OUT_SUBDIR = "CAP15"          # 输出子目录; 设为 None 则直接写入同级目录
+PICKLE_IN = None
+PICKLE_OUT = None  # None 表示覆盖输入
+OUT_SUBDIR = "CAP15"  # 输出子目录; 设为 None 则直接写入同级目录
 
-VIDEO_PATH = "/ssd01/user_acc_data/oppa/deeplabcut/videos/test/demo.mp4"
-PICKLE_PATH = PICKLE_IN      # make_video 默认使用同一 pickle
-OUTPUT_VIDEO = "/ssd01/user_acc_data/oppa/deeplabcut/projects/MiceTrackerFor20-Oppa-2024-12-08/analyze_videos/shuffle3/demo1/velocity_gating/CAP15/demo_tracked.mp4"
+VIDEO_PATH = PROJECT_ROOT / "deeplabcut/videos/test/demo.mp4"
+PICKLE_PATH = PICKLE_IN  # make_video 默认使用同一 pickle
+OUTPUT_VIDEO = (
+    PROJECT_ROOT
+    / "deeplabcut/projects/MiceTrackerFor20-Oppa-2024-12-08/analyze_videos/shuffle3/demo1/velocity_gating/CAP15/demo_tracked.mp4"
+)
 
-CENTERS_TXT = "/ssd01/user_acc_data/oppa/analysis/data/jc0813/readers_centers.txt"
-ROI_FILE = "/ssd01/user_acc_data/oppa/analysis/rfid_dlc_tracking/version2_tracking/roi_definitions.json"
+CENTERS_TXT = PROJECT_ROOT / "analysis/data/jc0813/readers_centers.txt"
+ROI_FILE = (
+    PROJECT_ROOT / "analysis/rfid_dlc_tracking/version2_tracking/roi_definitions.json"
+)
 
 # convert_detection2tracklets 默认参数文件
 CONVERT_DEFAULTS = BASE_DIR / "convert_detection2tracklets_config.yaml"
 
 # ================== 门控与重建参数 ==================
-FPS = 30.0                # 帧率 (frames/second)
-PX_PER_CM = 14.0          # 像素与厘米换算
-V_GATE_CMS = 80.0         # 最大速度门限 (cm/s)
+FPS = 30.0  # 帧率 (frames/second)
+PX_PER_CM = 14.0  # 像素与厘米换算
+V_GATE_CMS = 80.0  # 最大速度门限 (cm/s)
 
 PCUTOFF = 0.35
 HEAD_TAIL_SAMPLE = 5
@@ -61,10 +67,10 @@ MAX_FRAMES = None
 # ================== match_rfid_to_tracklets 默认参数 ==================
 # 路径可在此修改，或通过 load_mrt_config 从 YAML 覆盖
 MRT_PICKLE_PATH = PICKLE_IN
-MRT_RFID_CSV = "/ssd01/user_acc_data/oppa/analysis/data/jc0813/rfid_data_20250813_055827.csv"
+MRT_RFID_CSV = PROJECT_ROOT / "analysis/data/jc0813/rfid_data_20250813_055827.csv"
 MRT_CENTERS_TXT = CENTERS_TXT
-MRT_TS_CSV = "/ssd01/user_acc_data/oppa/analysis/data/jc0813/record_20250813_053913_timestamps.csv"
-MRT_OUT_DIR = None  # None -> 与 pickle 同目录创建 rfid_match_outputs/
+MRT_TS_CSV = PROJECT_ROOT / "analysis/data/jc0813/record_20250813_053913_timestamps.csv"
+MRT_OUT_DIR = PROJECT_ROOT / "analysis/data/jc0813/rfid_match_outputs"
 
 MRT_N_ROWS = 12
 MRT_N_COLS = 12
@@ -136,4 +142,3 @@ def load_mrt_config(yaml_path: str) -> None:
     }
 
     _apply_overrides(overrides)
-
