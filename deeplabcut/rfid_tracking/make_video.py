@@ -398,13 +398,13 @@ def main(
         print(f"读取到 {len(reader_positions)} 个读卡器位置")
 
     # 加载ROI（可选）
-    rois = (
-        load_rois(cfg.ROI_FILE)
-        if (cfg.DRAW_ROIS and cfg.ROI_FILE and Path(cfg.ROI_FILE).exists())
-        else []
-    )
-    if rois:
-        print(f"加载了 {len(rois)} 个ROI区域")
+    if cfg.DRAW_ROIS and cfg.ROI_FILE and Path(cfg.ROI_FILE).exists():
+        rois = load_rois(cfg.ROI_FILE)
+        if rois:
+            print(f"加载了 {len(rois)} 个ROI区域")
+    else:
+        rois = []
+        print("ROI file not provided; skipping ROI overlay")
 
     # 打开视频
     cap = cv2.VideoCapture(video_path)
