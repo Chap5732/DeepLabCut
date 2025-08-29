@@ -17,3 +17,5 @@ Integrating radio-frequency identification hardware allows antennas around the a
 ## Relationship to DeepLabCut
 
 All features remain compatible with standard DeepLabCut projects, models, and APIs. Users can train networks and run analyses with the usual commands while opting into these tracking modules when needed. For installation details, tutorials, and the broader feature set, please consult the official [DeepLabCut documentation](https://github.com/DeepLabCut/DeepLabCut).
+
+More information about the project please go to https://github.com/Chap5732/DeepLabCut/edit/feat/velocity-gating/deeplabcut/rfid_tracking/README.md
