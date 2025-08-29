@@ -8,6 +8,7 @@
 #
 # Licensed under GNU Lesser General Public License v3.0
 #
+import logging
 import os
 import pickle
 import warnings
@@ -29,6 +30,8 @@ from deeplabcut.pose_estimation_pytorch.apis.utils import (
     get_scorer_name,
     list_videos_in_folder,
 )
+
+logger = logging.getLogger(__name__)
 
 
 def convert_detections2tracklets(
@@ -209,12 +212,27 @@ def build_tracklets(
             inference_cfg.get("px_per_cm"),
             inference_cfg.get("fps"),
         )
+        if v_gate_pxpf is not None:
+            logger.info(
+                "Velocity gating enabled with threshold %.2f px/frame",
+                v_gate_pxpf,
+            )
+        else:
+            logger.info("Velocity gating disabled")
+        max_px_gate = inference_cfg.get("max_px_gate")
+        if max_px_gate is not None:
+            logger.info(
+                "Spatial gating enabled with max distance %s px",
+                max_px_gate,
+            )
+        else:
+            logger.info("Spatial gating disabled")
         mot_tracker = trackingutils.SORTEllipse(
             inference_cfg.get("max_age", 1),
             inference_cfg.get("min_hits", 1),
             inference_cfg.get("iou_threshold", 0.6),
             sd=2,
-            max_px=inference_cfg.get("max_px_gate"),
+            max_px=max_px_gate,
             v_gate_pxpf=v_gate_pxpf,
         )
 
