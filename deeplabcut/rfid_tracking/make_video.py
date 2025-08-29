@@ -199,6 +199,11 @@ def draw_tracklets_layer(frame, frame_idx, pts_in_frame, tk_rfid_events, tk_trai
         tk_trail.setdefault(tk, deque(maxlen=cfg.TRAIL_LEN))
         tk_trail[tk].append((frame_idx, xi, yi))
 
+    # 在当前帧缺失的 tracklet 上添加哨兵，标记轨迹中断
+    present_tks = {tk for tk, _ in pts_in_frame}
+    for tk in tk_trail.keys() - present_tks:
+        tk_trail[tk].append((frame_idx, None, None))
+
     # 绘制每个tracklet
     for tk, (x, y) in pts_in_frame:
         xi, yi = int(round(x)), int(round(y))
@@ -206,9 +211,16 @@ def draw_tracklets_layer(frame, frame_idx, pts_in_frame, tk_rfid_events, tk_trai
 
         # 轨迹线
         trail = list(tk_trail[tk])
+        for j in range(len(trail) - 1, -1, -1):
+            # 找到最后一个哨兵，忽略其之前的轨迹
+            if trail[j][1] is None or trail[j][2] is None:
+                trail = trail[j + 1 :]
+                break
         for i in range(1, len(trail)):
             f0, x0, y0 = trail[i - 1]
             f1, x1, y1 = trail[i]
+            if None in (x0, y0, x1, y1):
+                break
             if f1 - f0 > 1:
                 continue
             cv2.line(canvas, (x0, y0), (x1, y1), color, 2, cv2.LINE_AA)
