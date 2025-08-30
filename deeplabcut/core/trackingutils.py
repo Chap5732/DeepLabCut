@@ -463,10 +463,12 @@ class SORTEllipse(SORTBase):
                 for j, el_track in enumerate(ellipses_trackers):
                     dist = math.hypot(el.x - el_track.x, el.y - el_track.y)
                     if self.max_px is not None and dist > self.max_px:
-                        cost_matrix[i, j] = 0.0
+                        # Use a large negative number so the Hungarian algorithm never selects this pair
+                        cost_matrix[i, j] = -1e6
                         continue
                     if self.v_gate_pxpf is not None and dist > self.v_gate_pxpf:
-                        cost_matrix[i, j] = 0.0
+                        # Use a large negative number so the Hungarian algorithm never selects this pair
+                        cost_matrix[i, j] = -1e6
                         continue
 
                     cost = el.calc_similarity_with(el_track)
