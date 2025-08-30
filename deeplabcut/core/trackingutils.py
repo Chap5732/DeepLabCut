@@ -437,10 +437,14 @@ class SORTEllipse(SORTBase):
         self.n_frames += 1
 
         trackers = np.zeros((len(self.trackers), 6))
+        # Keep copy of last confirmed positions before prediction
+        prev_states = np.zeros((len(self.trackers), 5))
         for i in range(len(trackers)):
+            prev_states[i] = self.trackers[i].state.copy()
             trackers[i, :5] = self.trackers[i].predict()
         empty = np.isnan(trackers).any(axis=1)
         trackers = trackers[~empty]
+        prev_states = prev_states[~empty]
         for ind in np.flatnonzero(empty)[::-1]:
             self.trackers.pop(ind)
 
@@ -495,8 +499,32 @@ class SORTEllipse(SORTBase):
                 matches = np.empty((0, 2), dtype=int)
             else:
                 matches = np.stack(matches)
-            unmatched_trackers = np.asarray(unmatched_trackers)
-            unmatched_detections = np.asarray(unmatched_detections)
+
+            # Reject matches that imply a large displacement from the last
+            # confirmed position. This prevents trackers from snapping to
+            # detections that are close to the prediction but far from the
+            # previous confirmed location.
+            if len(matches):
+                keep = []
+                for det_ind, trk_ind in matches:
+                    prev = prev_states[trk_ind]
+                    disp = math.hypot(
+                        ellipses[det_ind].x - prev[0],
+                        ellipses[det_ind].y - prev[1],
+                    )
+                    if (self.max_px is not None and disp > self.max_px) or (
+                        self.v_gate_pxpf is not None and disp > self.v_gate_pxpf
+                    ):
+                        unmatched_detections.append(det_ind)
+                        unmatched_trackers.append(trk_ind)
+                    else:
+                        keep.append([det_ind, trk_ind])
+                matches = (
+                    np.asarray(keep, dtype=int) if len(keep) else np.empty((0, 2), dtype=int)
+                )
+
+            unmatched_trackers = np.unique(unmatched_trackers)
+            unmatched_detections = np.unique(unmatched_detections)
 
         if self.verbose:
             print(
