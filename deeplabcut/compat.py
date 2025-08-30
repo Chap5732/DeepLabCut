@@ -1449,7 +1449,9 @@ def convert_detections2tracklets(
         Configuration file for inference (assembly of individuals). Ideally
         should be obtained from cross validation (during evaluation). By default
         the parameters are loaded from inference_cfg.yaml, but these get_level_values
-        can be overwritten.
+        can be overwritten. Additional optional keys include
+        ``gate_last_position`` to reject assignments that move far from the last
+        confirmed tracker position.
 
     calibrate: bool, optional (default=False)
         If True, use training data to calibrate the animal assembly procedure.
@@ -1521,6 +1523,7 @@ def convert_detections2tracklets(
     #   - 'px_per_cm'         : float   # pixels per centimeter
     #   - 'fps'               : float   # video frame rate
     #   - 'max_px_gate'       : float   # absolute pixel distance gate (px/frame)
+    #   - 'gate_last_position': bool    # gate assignments by last confirmed position
     # along with existing keys such as 'max_age', 'min_hits', 'iou_threshold',
     # 'oks_threshold', 'pcutoff', 'topktoretain', ...
 
