@@ -207,18 +207,27 @@ def build_tracklets(
             inference_cfg.get("oks_threshold", 0.5),
         )
     else:
+        vg_cms = inference_cfg.get("velocity_gate_cms")
+        px_per_cm = inference_cfg.get("px_per_cm")
+        fps = inference_cfg.get("fps")
         v_gate_pxpf = trackingutils.compute_v_gate_pxpf(
-            inference_cfg.get("velocity_gate_cms"),
-            inference_cfg.get("px_per_cm"),
-            inference_cfg.get("fps"),
+            vg_cms,
+            px_per_cm,
+            fps,
         )
-        if v_gate_pxpf is not None:
+        if v_gate_pxpf is None:
+            logger.warning(
+                "Velocity gating disabled because `velocity_gate_cms`, `px_per_cm`, or `fps` is missing "
+                "(velocity_gate_cms=%s, px_per_cm=%s, fps=%s)",
+                vg_cms,
+                px_per_cm,
+                fps,
+            )
+        else:
             logger.info(
                 "Velocity gating enabled with threshold %.2f px/frame",
                 v_gate_pxpf,
             )
-        else:
-            logger.info("Velocity gating disabled")
         max_px_gate = inference_cfg.get("max_px_gate")
         if max_px_gate is not None:
             logger.info(
