@@ -119,8 +119,9 @@ def test_sort_ellipse_v_gate_pxpf():
 
 
 @pytest.mark.parametrize("gate_key", ["max_px", "v_gate_pxpf"])
-def test_sort_ellipse_rejects_large_displacement(gate_key):
-    mot_tracker = trackingutils.SORTEllipse(5, 1, 0.0)
+@pytest.mark.parametrize("gate_last_position", [False, True])
+def test_sort_ellipse_rejects_large_displacement(gate_key, gate_last_position):
+    mot_tracker = trackingutils.SORTEllipse(5, 1, 0.0, gate_last_position=gate_last_position)
     pose = _ellipse_pose((0, 0))[None, ...]
     mot_tracker.track(pose)
     far_pose = _ellipse_pose((100, 0))[None, ...]
@@ -128,9 +129,13 @@ def test_sort_ellipse_rejects_large_displacement(gate_key):
     setattr(mot_tracker, gate_key, 5)
     mismatch = _ellipse_pose((200, 0))[None, ...]
     ret = mot_tracker.track(mismatch)
-    assert ret.size == 0
-    assert len(mot_tracker.trackers) == 2
-    assert mot_tracker.trackers[0].time_since_update == 1
+    if gate_last_position:
+        assert ret.size == 0
+        assert len(mot_tracker.trackers) == 2
+        assert mot_tracker.trackers[0].time_since_update == 1
+    else:
+        assert ret.shape[0] == 1
+        assert ret[0, -2] == 0
 
 
 def test_tracking_ellipse(real_assemblies, real_tracklets):

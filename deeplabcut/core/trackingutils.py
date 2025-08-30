@@ -422,6 +422,7 @@ class SORTEllipse(SORTBase):
         max_px=None,
         v_gate_pxpf=None,
         verbose=False,
+        gate_last_position=False,
     ):
         self.max_age = max_age
         self.min_hits = min_hits
@@ -430,6 +431,7 @@ class SORTEllipse(SORTBase):
         self.max_px = max_px
         self.v_gate_pxpf = v_gate_pxpf
         self.verbose = verbose
+        self.gate_last_position = gate_last_position
         EllipseTracker.n_trackers = 0
         super().__init__()
 
@@ -474,6 +476,15 @@ class SORTEllipse(SORTBase):
                         # Use a large negative number so the Hungarian algorithm never selects this pair
                         cost_matrix[i, j] = -1e6
                         continue
+                    if self.gate_last_position:
+                        prev = prev_states[j]
+                        dist_prev = math.hypot(el.x - prev[0], el.y - prev[1])
+                        if self.max_px is not None and dist_prev > self.max_px:
+                            cost_matrix[i, j] = -1e6
+                            continue
+                        if self.v_gate_pxpf is not None and dist_prev > self.v_gate_pxpf:
+                            cost_matrix[i, j] = -1e6
+                            continue
 
                     cost = el.calc_similarity_with(el_track)
                     if identities is not None:
@@ -504,7 +515,7 @@ class SORTEllipse(SORTBase):
             # confirmed position. This prevents trackers from snapping to
             # detections that are close to the prediction but far from the
             # previous confirmed location.
-            if len(matches):
+            if self.gate_last_position and len(matches):
                 keep = []
                 for det_ind, trk_ind in matches:
                     prev = prev_states[trk_ind]
