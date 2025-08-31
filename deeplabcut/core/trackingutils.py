@@ -446,6 +446,9 @@ class SORTEllipse(SORTBase):
         self.iou_threshold = iou_threshold
         self.fitter = EllipseFitter(sd)
         self.max_px_gate = max_px_gate
+        # Maximum allowed velocity in pixels per frame. The effective
+        # displacement gate is this value scaled by the number of frames
+        # since the last update (dt).
         self.v_gate_pxpf = v_gate_pxpf
         self.verbose = verbose
         self.gate_last_position = gate_last_position
@@ -477,7 +480,9 @@ class SORTEllipse(SORTBase):
             unmatched_trackers = np.empty((0, 6), dtype=int)
         else:
             ellipses_trackers = [Ellipse(*t[:5]) for t in trackers]
-            last_confirmed = [Ellipse(*trk.last_confirmed_state) for trk in self.trackers]
+            last_confirmed = [
+                Ellipse(*trk.last_confirmed_state) for trk in self.trackers
+            ]
             cost_matrix = np.zeros((len(ellipses), len(ellipses_trackers)))
             for i, el in enumerate(ellipses):
                 for j, (el_track, el_last) in enumerate(
@@ -487,12 +492,12 @@ class SORTEllipse(SORTBase):
                         dist = math.hypot(el.x - el_last.x, el.y - el_last.y)
                     else:
                         dist = math.hypot(el.x - el_track.x, el.y - el_track.y)
-                    tsu = max(self.trackers[j].time_since_update, 1)
-                    if self.max_px_gate is not None and dist > self.max_px_gate:
+                    dt = max(self.trackers[j].time_since_update, 1)
+                    if self.max_px_gate is not None and dist > self.max_px_gate * dt:
                         # Use a large negative number so the Hungarian algorithm never selects this pair
                         cost_matrix[i, j] = -1e6
                         continue
-                    if self.v_gate_pxpf is not None and dist / tsu > self.v_gate_pxpf:
+                    if self.v_gate_pxpf is not None and dist > self.v_gate_pxpf * dt:
                         # Use a large negative number so the Hungarian algorithm never selects this pair
                         cost_matrix[i, j] = -1e6
                         continue
@@ -534,18 +539,20 @@ class SORTEllipse(SORTBase):
                         ellipses[det_ind].x - prev[0],
                         ellipses[det_ind].y - prev[1],
                     )
-                    tsu = max(self.trackers[trk_ind].time_since_update, 1)
+                    dt = max(self.trackers[trk_ind].time_since_update, 1)
                     if (
-                        self.max_px_gate is not None and disp > self.max_px_gate
+                        self.max_px_gate is not None and disp > self.max_px_gate * dt
                     ) or (
-                        self.v_gate_pxpf is not None and disp / tsu > self.v_gate_pxpf
+                        self.v_gate_pxpf is not None and disp > self.v_gate_pxpf * dt
                     ):
                         unmatched_detections.append(det_ind)
                         unmatched_trackers.append(trk_ind)
                     else:
                         keep.append([det_ind, trk_ind])
                 matches = (
-                    np.asarray(keep, dtype=int) if len(keep) else np.empty((0, 2), dtype=int)
+                    np.asarray(keep, dtype=int)
+                    if len(keep)
+                    else np.empty((0, 2), dtype=int)
                 )
 
             unmatched_trackers = np.unique(unmatched_trackers)
@@ -899,12 +906,14 @@ def reconstruct_all_ellipses(data, sd):
 
 
 def compute_v_gate_pxpf(v_gate_cms=None, px_per_cm=None, fps=None):
+    """Return velocity gate in pixels per frame.
+
+    The resulting threshold expresses the maximum allowed displacement for a
+    single frame. It is scaled by the number of frames elapsed (``dt``) when
+    used during gating.
+    """
     try:
-        if (
-            v_gate_cms is not None
-            and px_per_cm is not None
-            and fps is not None
-        ):
+        if v_gate_cms is not None and px_per_cm is not None and fps is not None:
             if v_gate_cms > 0 and px_per_cm > 0 and fps > 0:
                 return float(v_gate_cms * (px_per_cm / fps))
     except Exception:

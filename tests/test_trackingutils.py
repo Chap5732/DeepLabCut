@@ -10,6 +10,7 @@
 #
 import numpy as np
 import pytest
+
 from deeplabcut.core import trackingutils
 
 
@@ -100,6 +101,18 @@ def test_sort_ellipse_max_px_gate():
     assert len(mot_tracker.trackers) == 2
     assert mot_tracker.trackers[0].time_since_update == 1
     ret = mot_tracker.track(pose)
+    assert ret.shape[0] == 1
+    assert ret[0, -2] == 0
+
+
+def test_sort_ellipse_max_px_gate_scaled_by_dt():
+    mot_tracker = trackingutils.SORTEllipse(5, 1, 0.0, max_px_gate=5)
+    pose = _ellipse_pose((0, 0))[None, ...]
+    mot_tracker.track(pose)
+    # Skip a frame to increase the time since update to 2 frames
+    mot_tracker.track(np.empty((0, 4, 2)))
+    near_pose = _ellipse_pose((8, 0))[None, ...]
+    ret = mot_tracker.track(near_pose)
     assert ret.shape[0] == 1
     assert ret[0, -2] == 0
 
