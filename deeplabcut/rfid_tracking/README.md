@@ -78,35 +78,35 @@ project/
 ### 标签分配原理
 `match_rfid_to_tracklets.py` 模块负责将读卡器逐次捕获到的标签分配给对应 tracklet。核心流程如下：
 
-1. **时空匹配**  
-   - 每条 RFID 记录首先根据 `MRT_RFID_FRAME_RANGE` 对齐到最近的视频帧；只有在这一帧及其前后给定帧数内出现的 tracklet 才会被考虑。  
+1. **时空匹配**
+   - 每条 RFID 记录首先根据 `MRT_RFID_FRAME_RANGE` 对齐到最近的视频帧；只有在这一帧及其前后给定帧数内出现的 tracklet 才会被考虑。
    - 以读卡器的几何中心为圆心，搜索半径为 `MRT_COIL_DIAMETER_PX / 2 + MRT_HIT_MARGIN` 的范围；候选轨迹需在圆内至少命中一次。
 
-2. **候选筛选**  
-   - 轨迹末端关键点的 `p` 值必须高于 `MRT_PCUTOFF`；  
+2. **候选筛选**
+   - 轨迹末端关键点的 `p` 值必须高于 `MRT_PCUTOFF`；
    - 若启用 `MRT_UNIQUE_NEIGHBOR_ONLY`，要求在该半径内只有唯一 tracklet；否则会比较最邻近的两个候选，若距离差小于 `MRT_AMBIG_MARGIN_PX` 则判为歧义。
 
-3. **标签确认**  
-   - 为每条 tracklet 统计各标签的命中次数，要求命中总数 ≥ `MRT_TAG_MIN_READS` 且主标签占比 ≥ `MRT_TAG_DOMINANT_RATIO`。  
-   - 对于低命中但高纯度的情况，可通过 `MRT_LOW_READS_HIGH_PURITY_ASSIGN` 与 `MRT_LOW_READS_PURITY_THRESHOLD` 进行宽松分配。  
+3. **标签确认**
+   - 为每条 tracklet 统计各标签的命中次数，要求命中总数 ≥ `MRT_TAG_MIN_READS` 且主标签占比 ≥ `MRT_TAG_DOMINANT_RATIO`。
+   - 对于低命中但高纯度的情况，可通过 `MRT_LOW_READS_HIGH_PURITY_ASSIGN` 与 `MRT_LOW_READS_PURITY_THRESHOLD` 进行宽松分配。
    - 最终把确认的标签写入节点的 `tag` 字段，同时记录 `rfid_counts` 和具体命中帧。
 
 ### 轨迹重建原理
 `reconstruct_from_pickle.py` 以带标签的 tracklet 作为锚点，在整个时间轴上同步推进，构建连续的身份链：
 
-1. **锚点筛选**  
+1. **锚点筛选**
    - 只有标签命中次数 ≥ `ANCHOR_MIN_HITS` 的 tracklet 才被视为可靠锚点；它们按照起始时间排序并作为“水源”同时向两侧扩散。
 
-2. **时间–速度门控**  
-   - 为每个活跃锚点计算其波前位置（头/尾中心）；仅在时间间隔 `≤ MAX_GAP_FRAMES` 且位移 `d ≤ V_GATE_CMS × gap / (FPS / PX_PER_CM)` 的候选 tracklet 才会被纳入候选池。  
+2. **时间–速度门控**
+   - 为每个活跃锚点计算其波前位置（头/尾中心）；仅在时间间隔 `≤ MAX_GAP_FRAMES` 且位移 `d ≤ V_GATE_CMS × gap / (FPS / PX_PER_CM)` 的候选 tracklet 才会被纳入候选池。
    - 候选的代价定义为 `d + EPS_GAP × gap`，越小越优先。
 
-3. **同步推进与冲突裁决**  
-   - 所有锚点同时提名各自代价最低的候选，如果同一个 tracklet 被多个锚点竞争，则按代价从小到大依次决策。  
-   - 若最佳与次佳代价之差小于 `δ = min(DELTA_PX_CAP, DELTA_PROP × 上限位移)`，则判为歧义并冻结该候选，等待下一轮。  
+3. **同步推进与冲突裁决**
+   - 所有锚点同时提名各自代价最低的候选，如果同一个 tracklet 被多个锚点竞争，则按代价从小到大依次决策。
+   - 若最佳与次佳代价之差小于 `δ = min(DELTA_PX_CAP, DELTA_PROP × 上限位移)`，则判为歧义并冻结该候选，等待下一轮。
    - 被选中的轨迹加入对应身份链，源锚点的波前移动到新轨迹末端；若某方向候选耗尽，则该波前终止。
 
-4. **近锚点堤坝**  
+4. **近锚点堤坝**
    - 若同一标签在传播方向的 `MAX_GAP_FRAMES` 内已存在另一个锚点，则当前锚点不再越界扩张，以避免跨越可靠锚点造成错误连接。
 
 经过多轮推进后，所有波前都停止，最终得到多条无冲突的身份链，可用于后续可视化或行为分析。
@@ -127,6 +127,39 @@ MRT_TS_CSV: /path/to/timestamps.csv
 ```bash
 python run_pipeline.py config.yaml /path/to/video.mp4 /path/to/rfid.csv \
     /path/to/readers_centers.txt /path/to/timestamps.csv --config_override paths.yaml
+```
+
+### 启用速度/空间门控
+
+速度（`velocity_gate_cms`）与空间（`max_px_gate`）门控可在将检测结果转为 tracklets 时过滤不合理移动，从而提升身份稳定性。可在 YAML 文件中同时设置门控与相机参数：
+
+```yaml
+# gating.yaml
+velocity_gate_cms: 80      # cm/s
+px_per_cm: 14              # 像素/厘米
+fps: 30
+max_px_gate: 200           # px
+```
+
+随后在命令行调用时通过 `--config_override` 加载该文件：
+
+```bash
+python run_pipeline.py config.yaml video.mp4 rfid.csv centers.txt ts.csv \
+    --config_override gating.yaml
+```
+
+`run_pipeline.py` 默认以 INFO 级别输出日志；若在自定义脚本中调用 `run_pipeline()`，请先配置：
+
+```python
+import logging
+logging.basicConfig(level=logging.INFO)
+```
+
+当门控参数正确加载后，日志中会出现以下信息，表明速度与空间门控已启用：
+
+```
+INFO deeplabcut.pose_estimation_pytorch.apis.tracklets: Velocity gating enabled with threshold 37.33 px/frame
+INFO deeplabcut.pose_estimation_pytorch.apis.tracklets: Spatial gating enabled with max distance 200 px
 ```
 
 ### 一键全流程分析
@@ -344,3 +377,4 @@ DRAW_READERS: false
 - 使用前需要根据实际数据路径修改 `config.py`
 - 确保输入的 pickle 文件包含正确的 DLC tracklet 数据结构
 - ROI 文件格式目前只支持 polygon 类型的 JSON 格式
+- 运行管线后请确认日志中出现 “Velocity gating enabled...” 与 “Spatial gating enabled...” 信息；如未见此类输出，说明门控参数缺失或配置错误
