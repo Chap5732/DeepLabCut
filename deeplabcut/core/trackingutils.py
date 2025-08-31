@@ -477,15 +477,22 @@ class SORTEllipse(SORTBase):
             unmatched_trackers = np.empty((0, 6), dtype=int)
         else:
             ellipses_trackers = [Ellipse(*t[:5]) for t in trackers]
+            last_confirmed = [Ellipse(*trk.last_confirmed_state) for trk in self.trackers]
             cost_matrix = np.zeros((len(ellipses), len(ellipses_trackers)))
             for i, el in enumerate(ellipses):
-                for j, el_track in enumerate(ellipses_trackers):
-                    dist = math.hypot(el.x - el_track.x, el.y - el_track.y)
+                for j, (el_track, el_last) in enumerate(
+                    zip(ellipses_trackers, last_confirmed)
+                ):
+                    if self.gate_last_position:
+                        dist = math.hypot(el.x - el_last.x, el.y - el_last.y)
+                    else:
+                        dist = math.hypot(el.x - el_track.x, el.y - el_track.y)
+                    tsu = max(self.trackers[j].time_since_update, 1)
                     if self.max_px_gate is not None and dist > self.max_px_gate:
                         # Use a large negative number so the Hungarian algorithm never selects this pair
                         cost_matrix[i, j] = -1e6
                         continue
-                    if self.v_gate_pxpf is not None and dist > self.v_gate_pxpf:
+                    if self.v_gate_pxpf is not None and dist / tsu > self.v_gate_pxpf:
                         # Use a large negative number so the Hungarian algorithm never selects this pair
                         cost_matrix[i, j] = -1e6
                         continue
@@ -527,10 +534,11 @@ class SORTEllipse(SORTBase):
                         ellipses[det_ind].x - prev[0],
                         ellipses[det_ind].y - prev[1],
                     )
+                    tsu = max(self.trackers[trk_ind].time_since_update, 1)
                     if (
                         self.max_px_gate is not None and disp > self.max_px_gate
                     ) or (
-                        self.v_gate_pxpf is not None and disp > self.v_gate_pxpf
+                        self.v_gate_pxpf is not None and disp / tsu > self.v_gate_pxpf
                     ):
                         unmatched_detections.append(det_ind)
                         unmatched_trackers.append(trk_ind)
