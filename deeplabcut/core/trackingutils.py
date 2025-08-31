@@ -462,9 +462,9 @@ class SORTEllipse(SORTBase):
         for i in range(len(trackers)):
             trackers[i, :5] = self.trackers[i].predict()
         empty = np.isnan(trackers).any(axis=1)
-        trackers = trackers[~empty]
-        for ind in np.flatnonzero(empty)[::-1]:
-            self.trackers.pop(ind)
+        valid_idx = np.flatnonzero(~empty)
+        trackers = trackers[valid_idx]
+        unmatched_trackers = np.flatnonzero(empty).tolist()
 
         ellipses, pred_ids = [], []
         for i, pose in enumerate(poses):
@@ -477,22 +477,23 @@ class SORTEllipse(SORTBase):
         if not len(trackers):
             matches = np.empty((0, 2), dtype=int)
             unmatched_detections = np.arange(len(ellipses))
-            unmatched_trackers = np.empty((0, 6), dtype=int)
+            unmatched_trackers = np.array(unmatched_trackers, dtype=int)
         else:
             ellipses_trackers = [Ellipse(*t[:5]) for t in trackers]
             last_confirmed = [
-                Ellipse(*trk.last_confirmed_state) for trk in self.trackers
+                Ellipse(*self.trackers[idx].last_confirmed_state) for idx in valid_idx
             ]
             cost_matrix = np.zeros((len(ellipses), len(ellipses_trackers)))
             for i, el in enumerate(ellipses):
                 for j, (el_track, el_last) in enumerate(
                     zip(ellipses_trackers, last_confirmed)
                 ):
+                    tracker = self.trackers[valid_idx[j]]
                     if self.gate_last_position:
                         dist = math.hypot(el.x - el_last.x, el.y - el_last.y)
                     else:
                         dist = math.hypot(el.x - el_track.x, el.y - el_track.y)
-                    dt = max(self.trackers[j].time_since_update, 1)
+                    dt = max(tracker.time_since_update, 1)
                     if self.max_px_gate is not None and dist > self.max_px_gate * dt:
                         # Use a large negative number so the Hungarian algorithm never selects this pair
                         cost_matrix[i, j] = -1e6
@@ -504,24 +505,24 @@ class SORTEllipse(SORTBase):
 
                     cost = el.calc_similarity_with(el_track)
                     if identities is not None:
-                        match = 2 if pred_ids[i] == self.trackers[j].id_ else 1
+                        match = 2 if pred_ids[i] == tracker.id_ else 1
                         cost *= match
                     cost_matrix[i, j] = cost
             row_indices, col_indices = linear_sum_assignment(cost_matrix, maximize=True)
             unmatched_detections = [
                 i for i, _ in enumerate(ellipses) if i not in row_indices
             ]
-            unmatched_trackers = [
-                j for j, _ in enumerate(trackers) if j not in col_indices
-            ]
+            unmatched_trackers.extend(
+                valid_idx[j] for j, _ in enumerate(trackers) if j not in col_indices
+            )
             matches = []
             for row, col in zip(row_indices, col_indices):
                 val = cost_matrix[row, col]
                 if val < self.iou_threshold:
                     unmatched_detections.append(row)
-                    unmatched_trackers.append(col)
+                    unmatched_trackers.append(valid_idx[col])
                 else:
-                    matches.append([row, col])
+                    matches.append([row, valid_idx[col]])
             if not len(matches):
                 matches = np.empty((0, 2), dtype=int)
             else:
@@ -737,13 +738,16 @@ class SORTBox(SORTBase):
         for i in range(len(trackers)):
             trackers[i, :4] = self.trackers[i].predict()
         empty = np.isnan(trackers).any(axis=1)
-        trackers = trackers[~empty]
-        for ind in np.flatnonzero(empty)[::-1]:
-            self.trackers.pop(ind)
+        valid_idx = np.flatnonzero(~empty)
+        trackers = trackers[valid_idx]
 
         matched, unmatched_dets, unmatched_trks = self.match_detections_to_trackers(
             dets, trackers, self.iou_threshold
         )
+        unmatched_trks = np.asarray(unmatched_trks, dtype=int).ravel()
+        unmatched_trks = np.r_[np.flatnonzero(empty), valid_idx[unmatched_trks]]
+        if len(matched):
+            matched[:, 1] = valid_idx[matched[:, 1]]
 
         # update matched trackers with assigned detections
         animalindex = []
