@@ -286,11 +286,28 @@ class EllipseTracker(BaseTracker):
         self.kf.P *= 10.0
         self.kf.Q[5:, 5:] *= 0.01
         self.state = params
+        # Store the last confirmed state (centroid and shape) separately so
+        # that predictions do not overwrite it. This is used for gating
+        # decisions in the SORT tracker to ensure that associations are based
+        # on the last confirmed observation rather than the predicted one.
+        self.last_confirmed_state = np.asarray(params).copy()
 
     @BaseTracker.state.setter
     def state(self, params):
         state = np.asarray(params).reshape((-1, 1))
         super(EllipseTracker, type(self)).state.fset(self, state)
+
+    def update(self, params):
+        """Update the tracker with a new observation.
+
+        The ``last_confirmed_state`` attribute is refreshed only when a
+        detection is successfully associated with the tracker. The prediction
+        step deliberately leaves this attribute untouched so that gating is
+        performed using the last confirmed position.
+        """
+        super().update(np.asarray(params))
+        # After a successful update, synchronise the last confirmed state.
+        self.last_confirmed_state = self.state.copy()
 
 
 class SkeletonTracker(BaseTracker):
@@ -439,14 +456,10 @@ class SORTEllipse(SORTBase):
         self.n_frames += 1
 
         trackers = np.zeros((len(self.trackers), 6))
-        # Keep copy of last confirmed positions before prediction
-        prev_states = np.zeros((len(self.trackers), 5))
         for i in range(len(trackers)):
-            prev_states[i] = self.trackers[i].state.copy()
             trackers[i, :5] = self.trackers[i].predict()
         empty = np.isnan(trackers).any(axis=1)
         trackers = trackers[~empty]
-        prev_states = prev_states[~empty]
         for ind in np.flatnonzero(empty)[::-1]:
             self.trackers.pop(ind)
 
@@ -509,7 +522,7 @@ class SORTEllipse(SORTBase):
             if self.gate_last_position and len(matches):
                 keep = []
                 for det_ind, trk_ind in matches:
-                    prev = prev_states[trk_ind]
+                    prev = self.trackers[trk_ind].last_confirmed_state
                     disp = math.hypot(
                         ellipses[det_ind].x - prev[0],
                         ellipses[det_ind].y - prev[1],
