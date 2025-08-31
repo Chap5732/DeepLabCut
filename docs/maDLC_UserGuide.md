@@ -789,7 +789,7 @@ max_age: 100
 # minimum number of consecutive frames before a detection is tracked
 min_hits: 3
 # additionally gate assignments by the last confirmed tracker position
-gate_last_position: False
+gate_last_position: True
 ```
 
   - **IMPORTANT POINT FOR SUPERVISED IDENTITY TRACKING**

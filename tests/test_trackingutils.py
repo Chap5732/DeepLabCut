@@ -75,7 +75,7 @@ def _ellipse_pose(offset):
     return base + np.asarray(offset)
 
 
-@pytest.mark.parametrize("gate_kwargs", [{"max_px": 5}, {"v_gate_pxpf": 5}])
+@pytest.mark.parametrize("gate_kwargs", [{"max_px_gate": 5}, {"v_gate_pxpf": 5}])
 def test_sort_ellipse_gates_zero_iou(gate_kwargs):
     mot_tracker = trackingutils.SORTEllipse(5, 1, 0, **gate_kwargs)
     pose = _ellipse_pose((0, 0))[None, ...]
@@ -91,7 +91,7 @@ def test_sort_ellipse_gates_zero_iou(gate_kwargs):
 
 
 def test_sort_ellipse_max_px_gate():
-    mot_tracker = trackingutils.SORTEllipse(5, 1, 0.1, max_px=5)
+    mot_tracker = trackingutils.SORTEllipse(5, 1, 0.1, max_px_gate=5)
     pose = _ellipse_pose((0, 0))[None, ...]
     mot_tracker.track(pose)
     far_pose = _ellipse_pose((10, 10))[None, ...]
@@ -118,10 +118,13 @@ def test_sort_ellipse_v_gate_pxpf():
     assert ret[0, -2] == 0
 
 
-@pytest.mark.parametrize("gate_key", ["max_px", "v_gate_pxpf"])
-@pytest.mark.parametrize("gate_last_position", [False, True])
+@pytest.mark.parametrize("gate_key", ["max_px_gate", "v_gate_pxpf"])
+@pytest.mark.parametrize("gate_last_position", [None, False, True])
 def test_sort_ellipse_rejects_large_displacement(gate_key, gate_last_position):
-    mot_tracker = trackingutils.SORTEllipse(5, 1, 0.0, gate_last_position=gate_last_position)
+    kwargs = {}
+    if gate_last_position is not None:
+        kwargs["gate_last_position"] = gate_last_position
+    mot_tracker = trackingutils.SORTEllipse(5, 1, 0.0, **kwargs)
     pose = _ellipse_pose((0, 0))[None, ...]
     mot_tracker.track(pose)
     far_pose = _ellipse_pose((100, 0))[None, ...]
@@ -129,7 +132,8 @@ def test_sort_ellipse_rejects_large_displacement(gate_key, gate_last_position):
     setattr(mot_tracker, gate_key, 5)
     mismatch = _ellipse_pose((200, 0))[None, ...]
     ret = mot_tracker.track(mismatch)
-    if gate_last_position:
+    enabled = True if gate_last_position is None else gate_last_position
+    if enabled:
         assert ret.size == 0
         assert len(mot_tracker.trackers) == 2
         assert mot_tracker.trackers[0].time_since_update == 1

@@ -241,9 +241,9 @@ def build_tracklets(
             inference_cfg.get("min_hits", 1),
             inference_cfg.get("iou_threshold", 0.6),
             sd=2,
-            max_px=max_px_gate,
+            max_px_gate=max_px_gate,
             v_gate_pxpf=v_gate_pxpf,
-            gate_last_position=inference_cfg.get("gate_last_position", False),
+            gate_last_position=inference_cfg.get("gate_last_position", True),
         )
 
     tracklets = {}
