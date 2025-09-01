@@ -1474,6 +1474,7 @@ def _convert_detections_to_tracklets(
             max_px_gate=inference_cfg.get("max_px_gate"),
             v_gate_pxpf=v_gate_pxpf,
             gate_last_position=inference_cfg.get("gate_last_position", True),
+            max_dt_for_gating=inference_cfg.get("max_dt_for_gating", 5),
         )
     tracklets = {}
 
@@ -1776,6 +1777,7 @@ def convert_detections2tracklets(
                         max_px_gate=inferencecfg.get("max_px_gate"),
                         v_gate_pxpf=v_gate_pxpf,
                         gate_last_position=inferencecfg.get("gate_last_position", True),
+                        max_dt_for_gating=inferencecfg.get("max_dt_for_gating", 5),
                     )
                 tracklets = {}
                 multi_bpts = cfg["multianimalbodyparts"]

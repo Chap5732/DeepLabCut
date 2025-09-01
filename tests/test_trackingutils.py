@@ -117,6 +117,20 @@ def test_sort_ellipse_max_px_gate_scaled_by_dt():
     assert ret[0, -2] == 0
 
 
+def test_sort_ellipse_max_dt_for_gating():
+    mot_tracker = trackingutils.SORTEllipse(
+        20, 1, 0.0, max_px_gate=5, max_dt_for_gating=3
+    )
+    pose = _ellipse_pose((0, 0))[None, ...]
+    mot_tracker.track(pose)
+    for _ in range(10):
+        mot_tracker.track(np.empty((0, 4, 2)))
+    near_pose = _ellipse_pose((20, 0))[None, ...]
+    ret = mot_tracker.track(near_pose)
+    assert ret.size == 0
+    assert len(mot_tracker.trackers) == 2
+
+
 def test_sort_ellipse_v_gate_pxpf():
     mot_tracker = trackingutils.SORTEllipse(5, 1, 0.1, v_gate_pxpf=5)
     pose = _ellipse_pose((0, 0))[None, ...]
