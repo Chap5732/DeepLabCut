@@ -149,6 +149,22 @@ def run_pipeline(
     for key, val in gate_params.items():
         if val is not None:
             inference_cfg.setdefault(key, val)
+    logger.info("inference_cfg: %s", inference_cfg)
+    logger.info(
+        "Gating parameters: %s",
+        {
+            k: inference_cfg.get(k)
+            for k in (
+                "max_px_gate",
+                "velocity_gate_cms",
+                "px_per_cm",
+                "fps",
+                "gate_last_position",
+                "pcutoff",
+                "topktoretain",
+            )
+        },
+    )
 
     # 1) run inference to create assemblies without auto tracking
     logger.info(
