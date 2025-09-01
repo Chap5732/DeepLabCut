@@ -64,11 +64,21 @@ def test_sort_ellipse():
     tracklets = dict()
     mot_tracker = trackingutils.SORTEllipse(1, 1, 0.6)
     poses = np.random.rand(2, 10, 3)
+    pre_tsu = {trk.id: trk.time_since_update for trk in mot_tracker.trackers}
     trackers = mot_tracker.track(poses[..., :2])
     assert trackers.shape == (2, 7)
-    trackingutils.fill_tracklets(tracklets, trackers, poses, imname=0)
+    time_since_updates = {
+        trk.id: pre_tsu.get(trk.id, 0) for trk in mot_tracker.trackers
+    }
+    trackingutils.fill_tracklets(
+        tracklets, trackers, poses, imname=0, time_since_updates=time_since_updates
+    )
     assert all(id_ in tracklets for id_ in trackers[:, -2])
     assert all(np.array_equal(tracklets[n][0], pose) for n, pose in enumerate(poses))
+    assert "time_since_update" in tracklets
+    assert all(
+        tracklets["time_since_update"][n][0] == 0 for n in range(trackers.shape[0])
+    )
 
 
 def _ellipse_pose(offset):

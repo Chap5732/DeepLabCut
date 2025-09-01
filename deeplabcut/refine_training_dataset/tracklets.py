@@ -8,13 +8,15 @@
 #
 # Licensed under GNU Lesser General Public License v3.0
 #
-import numpy as np
-import pandas as pd
 import pickle
 import re
+
+import numpy as np
+import pandas as pd
+from tqdm import trange
+
 from deeplabcut.post_processing import columnwise_spline_interp
 from deeplabcut.utils import auxiliaryfunctions
-from tqdm import trange
 
 
 class TrackletManager:
@@ -67,9 +69,11 @@ class TrackletManager:
         self.swapping_pairs = []
         self.swapping_bodyparts = []
         self._label_pairs = None
+        self.time_since_update = {}
 
     def _load_tracklets(self, tracklets, auto_fill):
         header = tracklets.pop("header")
+        self.time_since_update = tracklets.pop("time_since_update", {})
         self.scorer = header.get_level_values("scorer").unique().to_list()
         bodyparts = header.get_level_values("bodyparts")
         bodyparts_multi = [
@@ -176,9 +180,9 @@ class TrackletManager:
                             rows, cols = np.nonzero(has_data)
                             for i, j in zip(idx, better):
                                 sl = slice(j * 3, j * 3 + 3)
-                                tracklets_multi[i, inds[rows[sl]], cols[sl]] = (
-                                    remaining.flat[sl]
-                                )
+                                tracklets_multi[
+                                    i, inds[rows[sl]], cols[sl]
+                                ] = remaining.flat[sl]
                     else:
                         rows, cols = np.nonzero(has_data)
                         n = np.argmin(overwrite_risk)
@@ -245,6 +249,7 @@ class TrackletManager:
 
     def load_tracklets_from_hdf(self, filename):
         self.filename = filename
+        self.time_since_update = {}
         df = pd.read_hdf(filename)
 
         # Fill existing gaps
