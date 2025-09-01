@@ -576,20 +576,19 @@ class SORTEllipse(SORTBase):
             else:
                 matches = np.stack(matches)
 
-            # Reject matches that imply a large displacement from the last
-            # confirmed position. This prevents trackers from snapping to
-            # detections that are close to the prediction but far from the
-            # previous confirmed location.
+            # Reject matches that imply a large displacement between the
+            # centroid of all valid keypoints and the last confirmed
+            # centroid. This avoids accepting detections whose ellipse fits
+            # drift away from the underlying keypoints.
             if self.gate_last_position and len(matches):
                 keep = []
                 for det_ind, trk_ind in matches:
-                    prev = self.trackers[trk_ind].last_confirmed_state
-                    disp = math.hypot(
-                        ellipses[det_ind].x - prev[0],
-                        ellipses[det_ind].y - prev[1],
-                    )
+                    tracker = self.trackers[trk_ind]
+                    prev_centroid = tracker.last_confirmed_centroid
+                    det_centroid = centroids[det_ind]
+                    disp = np.linalg.norm(det_centroid - prev_centroid)
                     dt = min(
-                        max(self.trackers[trk_ind].time_since_update, 1),
+                        max(tracker.time_since_update, 1),
                         self.max_dt_for_gating,
                     )
                     if (
