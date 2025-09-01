@@ -489,6 +489,10 @@ class SORTEllipse(SORTBase):
         ellipses, pred_ids = [], []
         for i, pose in enumerate(poses):
             el = self.fitter.fit(pose)
+            if el is None:
+                center = np.nanmean(pose, axis=0)
+                if np.isfinite(center).all():
+                    el = Ellipse(center[0], center[1], 1.0, 1.0, 0.0)
             if el is not None:
                 ellipses.append(el)
                 if identities is not None:
