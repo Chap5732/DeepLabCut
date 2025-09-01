@@ -4,8 +4,13 @@
 from __future__ import annotations
 
 import argparse
+import logging
 
 from deeplabcut.rfid_tracking.make_video import main as make_video
+
+
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
 
 
 def build_argparser() -> argparse.ArgumentParser:
@@ -31,6 +36,7 @@ def build_argparser() -> argparse.ArgumentParser:
 
 def main() -> None:
     args = build_argparser().parse_args()
+    logger.info("Arguments: %s", args)
     make_video(
         video_path=args.video_path,
         pickle_path=args.pickle_path,

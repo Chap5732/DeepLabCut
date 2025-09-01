@@ -149,7 +149,7 @@ def run_pipeline(
     for key, val in gate_params.items():
         if val is not None:
             inference_cfg.setdefault(key, val)
-    logger.info("inference_cfg: %s", inference_cfg)
+    logger.info("Loaded inference_cfg: %s", inference_cfg)
     logger.info(
         "Gating parameters: %s",
         {
