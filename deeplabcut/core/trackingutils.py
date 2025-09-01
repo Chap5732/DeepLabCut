@@ -1,10 +1,8 @@
+# -*- coding: utf-8 -*-
 #
 # DeepLabCut Toolbox (deeplabcut.org)
 # © A. & M.W. Mathis Labs
 # https://github.com/DeepLabCut/DeepLabCut
-#
-# Please see AUTHORS for contributors.
-# https://github.com/DeepLabCut/DeepLabCut/blob/main/AUTHORS
 #
 # Licensed under GNU Lesser General Public License v3.0
 #
@@ -59,12 +57,7 @@ class BaseTracker:
     n_trackers = 0
 
     def __init__(self, dim, dim_z):
-        self.kf = kinematic_kf(
-            dim,
-            1,
-            dim_z=dim_z,
-            order_by_dim=False,
-        )
+        self.kf = kinematic_kf(dim, 1, dim_z=dim_z, order_by_dim=False)
         self.id = self.__class__.n_trackers
         self.__class__.n_trackers += 1
         self.time_since_update = 0
@@ -116,14 +109,10 @@ class Ellipse:
         max_dist = max(
             self.height, self.width, other_ellipse.height, other_ellipse.width
         )
-        dist = math.sqrt(
-            (self.x - other_ellipse.x) ** 2 + (self.y - other_ellipse.y) ** 2
-        )
-
+        dist = math.hypot(self.x - other_ellipse.x, self.y - other_ellipse.y)
         if max_dist == 0:
-            max_dist = 1
-
-        cost1 = 1 - min(dist / max_dist, 1)
+            max_dist = 1.0
+        cost1 = 1 - min(dist / max_dist, 1.0)
         cost2 = abs(math.cos(self.theta - other_ellipse.theta))
         return 0.8 * cost1 + 0.2 * cost2 * cost1
 
@@ -192,16 +181,6 @@ class EllipseFitter:
     @staticmethod
     @jit(nopython=True)
     def _fit(x, y):
-        """
-        Least Squares ellipse fitting algorithm
-        Fit an ellipse to a set of X- and Y-coordinates.
-        See Halir and Flusser, 1998 for implementation details
-
-        :param x: ndarray, 1D trajectory
-        :param y: ndarray, 1D trajectory
-        :return: 1D ndarray of 6 coefficients of the general quadratic curve:
-            ax^2 + 2bxy + cy^2 + 2dx + 2fy + g = 0
-        """
         D1 = np.vstack((x * x, x * y, y * y))
         D2 = np.vstack((x, y, np.ones_like(x)))
         S1 = D1 @ D1.T
@@ -222,18 +201,8 @@ class EllipseFitter:
     @staticmethod
     @jit(nopython=True)
     def _fit_error(x, y, sd):
-        """
-        Fit a sd-sigma covariance error ellipse to the data.
-
-        :param x: ndarray, 1D input of X coordinates
-        :param y: ndarray, 1D input of Y coordinates
-        :param sd: int, size of the error ellipse in 'standard deviation'
-        :return: ellipse center, semi-axes length, angle to the X-axis
-        """
         cov = np.cov(x, y)
-        E, V = np.linalg.eigh(cov)  # Returns the eigenvalues in ascending order
-        # r2 = chi2.ppf(2 * norm.cdf(sd) - 1, 2)
-        # height, width = np.sqrt(E * r2)
+        E, V = np.linalg.eigh(cov)  # ascending
         height, width = 2 * sd * np.sqrt(E)
         a, b = V[:, 1]
         rotation = math.atan2(b, a) % np.pi
@@ -242,39 +211,22 @@ class EllipseFitter:
     @staticmethod
     @jit(nopython=True)
     def calc_parameters(coeffs):
-        """
-        Calculate ellipse center coordinates, semi-axes lengths, and
-        the counterclockwise angle of rotation from the x-axis to the ellipse major axis.
-        Visit http://mathworld.wolfram.com/Ellipse.html
-        for how to estimate ellipse parameters.
-
-        :param coeffs: list of fitting coefficients
-        :return: center: 1D ndarray, semi-axes: 1D ndarray, angle: float
-        """
-        # The general quadratic curve has the form:
-        # ax^2 + 2bxy + cy^2 + 2dx + 2fy + g = 0
         a, b, c, d, f, g = coeffs
         b *= 0.5
         d *= 0.5
         f *= 0.5
 
-        # Ellipse center coordinates
         x0 = (c * d - b * f) / (b * b - a * c)
         y0 = (a * f - b * d) / (b * b - a * c)
 
-        # Semi-axes lengths
         num = 2 * (a * f * f + c * d * d + g * b * b - 2 * b * d * f - a * c * g)
         den1 = (b * b - a * c) * (np.sqrt((a - c) ** 2 + 4 * b * b) - (a + c))
         den2 = (b * b - a * c) * (-np.sqrt((a - c) ** 2 + 4 * b * b) - (a + c))
         major = np.sqrt(num / den1)
         minor = np.sqrt(num / den2)
 
-        # Angle to the horizontal
         if b == 0:
-            if a < c:
-                phi = 0
-            else:
-                phi = np.pi / 2
+            phi = 0 if a < c else np.pi / 2
         else:
             if a < c:
                 phi = np.arctan(2 * b / (a - c)) / 2
@@ -288,18 +240,12 @@ class EllipseTracker(BaseTracker):
     def __init__(self, params, centroid):
         super().__init__(dim=5, dim_z=5)
         self.kf.R[2:, 2:] *= 10.0
-        # High uncertainty to the unobservable initial velocities
-        self.kf.P[5:, 5:] *= 1000.0
+        self.kf.P[5:, 5:] *= 1000.0  # velocity unobservable initially
         self.kf.P *= 10.0
         self.kf.Q[5:, 5:] *= 0.01
         self.state = params
-        # Store the last confirmed state (centroid and shape) separately so
-        # that predictions do not overwrite it. This is used for gating
-        # decisions in the SORT tracker to ensure that associations are based
-        # on the last confirmed observation rather than the predicted one.
+        # gating based on last confirmed (not prediction)
         self.last_confirmed_state = np.asarray(params).copy()
-        # Additionally store the centroid of the last confirmed pose for
-        # distance gating in subsequent frames.
         self.last_confirmed_centroid = np.asarray(centroid).copy()
 
     @BaseTracker.state.setter
@@ -308,17 +254,7 @@ class EllipseTracker(BaseTracker):
         super(EllipseTracker, type(self)).state.fset(self, state)
 
     def update(self, params, centroid):
-        """Update the tracker with a new observation.
-
-        The ``last_confirmed_state`` attribute is refreshed only when a
-        detection is successfully associated with the tracker. The prediction
-        step deliberately leaves this attribute untouched so that gating is
-        performed using the last confirmed position. The centroid of the
-        observation is also stored for future distance gating.
-        """
         super().update(np.asarray(params))
-        # After a successful update, synchronise the last confirmed state and
-        # centroid.
         self.last_confirmed_state = self.state.copy()
         self.last_confirmed_centroid = np.asarray(centroid).copy()
 
@@ -375,7 +311,6 @@ class BoxTracker(BaseTracker):
             ]
         )
         self.kf.R[2:, 2:] *= 10.0
-        # Give high uncertainty to the unobservable initial velocities
         self.kf.P[4:, 4:] *= 1000.0
         self.kf.P *= 10.0
         self.kf.Q[-1, -1] *= 0.01
@@ -401,10 +336,6 @@ class BoxTracker(BaseTracker):
 
     @staticmethod
     def convert_x_to_bbox(x, score=None):
-        """
-        Takes a bounding box in the centre form [x,y,s,r] and returns it in the form
-        [x1,y1,x2,y2] where x1,y1 is the top left and x2,y2 is the bottom right
-        """
         w = np.sqrt(x[2] * x[3])
         h = x[2] / w
         if score is None:
@@ -418,16 +349,11 @@ class BoxTracker(BaseTracker):
 
     @staticmethod
     def convert_bbox_to_z(bbox):
-        """
-        Takes a bounding box in the form [x1,y1,x2,y2] and returns z in the form
-        [x,y,s,r] where x,y is the centre of the box and s is the scale/area and r is
-        the aspect ratio
-        """
         w = bbox[2] - bbox[0]
         h = bbox[3] - bbox[1]
         x = bbox[0] + w / 2.0
         y = bbox[1] + h / 2.0
-        s = w * h  # scale is just area
+        s = w * h
         r = w / float(h)
         return np.array([x, y, s, r]).reshape((4, 1))
 
@@ -438,8 +364,24 @@ class SORTBase(metaclass=abc.ABCMeta):
         self.trackers = []
 
     @abc.abstractmethod
-    def track(self):
+    def track(self, *args, **kwargs):
         pass
+
+
+def _allowed_disp(max_px_gate, v_gate_pxpf, dt):
+    """Return allowed displacement based on gates.
+    - Absolute gate: fixed radius (NOT scaled by dt).
+    - Velocity gate: scaled by dt.
+    - If both provided: take the stricter one (min).
+    """
+    limits = []
+    if max_px_gate is not None and max_px_gate > 0:
+        limits.append(float(max_px_gate))
+    if v_gate_pxpf is not None and v_gate_pxpf > 0:
+        limits.append(float(v_gate_pxpf) * float(dt))
+    if not limits:
+        return None
+    return min(limits)
 
 
 class SORTEllipse(SORTBase):
@@ -458,26 +400,18 @@ class SORTEllipse(SORTBase):
     ):
         self.max_age = max_age
         self.min_hits = min_hits
-        self.iou_threshold = iou_threshold
+        self.iou_threshold = iou_threshold  # actually a similarity threshold
         self.fitter = EllipseFitter(sd, min_n_valid)
         self.max_px_gate = max_px_gate
-        # Maximum allowed velocity in pixels per frame. The effective
-        # displacement gate is this value scaled by the number of frames
-        # since the last update (dt).
-        self.v_gate_pxpf = v_gate_pxpf
+        self.v_gate_pxpf = v_gate_pxpf  # px per frame
         self.verbose = verbose
         self.gate_last_position = gate_last_position
-        # Cap on how many frames since the last update can widen the gate.
-        # Typical values are between 1 and 5 frames.
-        self.max_dt_for_gating = max_dt_for_gating
+        self.max_dt_for_gating = max(1, int(max_dt_for_gating))
         self.min_n_valid = min_n_valid
         EllipseTracker.n_trackers = 0
         super().__init__()
         logger.info(
-            (
-                "SORTEllipse initialized with max_px_gate=%s, v_gate_pxpf=%s, "
-                "gate_last_position=%s, max_dt_for_gating=%s, max_age=%s, min_hits=%s, iou_threshold=%s, min_n_valid=%s"
-            ),
+            "SORTEllipse init: max_px_gate=%s v_gate_pxpf=%s gate_last=%s max_dt=%s max_age=%s min_hits=%s sim_thr=%s min_n_valid=%s",
             self.max_px_gate,
             self.v_gate_pxpf,
             self.gate_last_position,
@@ -491,6 +425,7 @@ class SORTEllipse(SORTBase):
     def track(self, poses, identities=None):
         self.n_frames += 1
 
+        # 1) 预测所有 tracker
         trackers = np.zeros((len(self.trackers), 6))
         for i in range(len(trackers)):
             trackers[i, :5] = self.trackers[i].predict()
@@ -499,23 +434,29 @@ class SORTEllipse(SORTBase):
         trackers = trackers[valid_idx]
         unmatched_trackers = np.flatnonzero(empty).tolist()
 
-        ellipses, centroids, pred_ids = [], [], []
+        # 2) 拟合检测（椭圆 + 质心）
+        ellipses, centroids, pred_ids, det_indices = [], [], [], []
         unmatched_detections = []
-        det_indices = []
         for i, pose in enumerate(poses):
             el = self.fitter.fit(pose)
-            if el is not None:
-                centroid = np.nanmean(pose[:, :2], axis=0)
-                if np.isnan(centroid).any():
-                    unmatched_detections.append(i)
-                    continue
-                ellipses.append(el)
-                centroids.append(centroid)
-                det_indices.append(i)
-                if identities is not None:
+            if el is None:
+                unmatched_detections.append(i)
+                continue
+            centroid = np.nanmean(pose[:, :2], axis=0)
+            if not np.isfinite(centroid).all():
+                unmatched_detections.append(i)
+                continue
+            ellipses.append(el)
+            centroids.append(centroid.astype(float))
+            det_indices.append(i)
+            if identities is not None:
+                try:
                     pred_ids.append(mode(identities[i])[0][0])
+                except Exception:
+                    pred_ids.append(None)
 
         if not len(trackers):
+            # 没有活动tracker，全部当作未匹配检测，后面逐个spawn
             matches = np.empty((0, 2), dtype=int)
             unmatched_detection_idx = list(range(len(ellipses)))
             unmatched_detections.extend(det_indices[j] for j in unmatched_detection_idx)
@@ -523,122 +464,150 @@ class SORTEllipse(SORTBase):
             unmatched_detection_idx = np.array(unmatched_detection_idx, dtype=int)
             unmatched_trackers = np.array(unmatched_trackers, dtype=int)
         else:
+            # 3) 构造代价矩阵（加入硬门控）
             ellipses_trackers = [Ellipse(*t[:5]) for t in trackers]
             last_confirmed = [
                 Ellipse(*self.trackers[idx].last_confirmed_state) for idx in valid_idx
             ]
             cost_matrix = np.zeros((len(ellipses), len(ellipses_trackers)))
+
             for i, (el, centroid) in enumerate(zip(ellipses, centroids)):
                 for j, (el_track, el_last) in enumerate(
                     zip(ellipses_trackers, last_confirmed)
                 ):
                     tracker = self.trackers[valid_idx[j]]
+
                     if self.gate_last_position:
-                        dist = np.linalg.norm(
-                            centroid - tracker.last_confirmed_centroid
+                        dist = float(
+                            np.linalg.norm(centroid - tracker.last_confirmed_centroid)
                         )
                     else:
-                        dist = math.hypot(
-                            centroid[0] - el_track.x, centroid[1] - el_track.y
-                        )
+                        dist = math.hypot(centroid[0] - el_track.x, centroid[1] - el_track.y)
+
                     dt = min(max(tracker.time_since_update, 1), self.max_dt_for_gating)
-                    if self.max_px_gate is not None and dist > self.max_px_gate * dt:
-                        # Use a large negative number so the Hungarian algorithm never selects this pair
-                        cost_matrix[i, j] = -1e6
-                        continue
-                    if self.v_gate_pxpf is not None and dist > self.v_gate_pxpf * dt:
-                        # Use a large negative number so the Hungarian algorithm never selects this pair
-                        cost_matrix[i, j] = -1e6
+                    allowed = _allowed_disp(self.max_px_gate, self.v_gate_pxpf, dt)
+
+                    if allowed is not None and dist > allowed:
+                        cost_matrix[i, j] = -1e6  # 硬屏蔽
+                        logger.debug(
+                            "[GATE BLOCK][matrix] trk=%s dt=%d dist=%.1f allowed=%.1f frame=%s",
+                            tracker.id, dt, dist, allowed, self.n_frames
+                        )
                         continue
 
                     cost = el.calc_similarity_with(el_track)
-                    if identities is not None:
-                        match = 2 if pred_ids[i] == tracker.id_ else 1
-                        cost *= match
+                    if identities is not None and j < len(self.trackers):
+                        id_match = (
+                            2.0 if (hasattr(tracker, "id_") and pred_ids and pred_ids[i] == tracker.id_)
+                            else 1.0
+                        )
+                        cost *= id_match
                     cost_matrix[i, j] = cost
-            row_indices, col_indices = linear_sum_assignment(cost_matrix, maximize=True)
-            unmatched_detection_idx = [
-                i for i, _ in enumerate(ellipses) if i not in row_indices
-            ]
+
+            # 可行性检查（便于调试）
+            feasible_rows = (cost_matrix > -1e5).any(axis=1) if cost_matrix.size else []
+            feasible_cols = (cost_matrix > -1e5).any(axis=0) if cost_matrix.size else []
+            if self.verbose:
+                bad_rows = np.where(~feasible_rows)[0].tolist() if len(feasible_rows) else []
+                bad_cols = np.where(~feasible_cols)[0].tolist() if len(feasible_cols) else []
+                if bad_rows or bad_cols:
+                    logger.debug(
+                        "No feasible rows (det idx): %s ; no feasible cols (trk local idx): %s",
+                        bad_rows, bad_cols
+                    )
+
+            # 4) 匈牙利匹配
+            if len(ellipses) and len(ellipses_trackers):
+                row_indices, col_indices = linear_sum_assignment(cost_matrix, maximize=True)
+            else:
+                row_indices, col_indices = np.array([], dtype=int), np.array([], dtype=int)
+
+            unmatched_detection_idx = [i for i in range(len(ellipses)) if i not in row_indices]
             unmatched_trackers.extend(
-                valid_idx[j] for j, _ in enumerate(trackers) if j not in col_indices
+                valid_idx[j] for j in range(len(trackers)) if j not in col_indices
             )
-            matches = []
+
+            matches_list = []
             for row, col in zip(row_indices, col_indices):
                 val = cost_matrix[row, col]
                 if val < self.iou_threshold:
                     unmatched_detection_idx.append(row)
                     unmatched_trackers.append(valid_idx[col])
                 else:
-                    matches.append([row, valid_idx[col]])
-            if not len(matches):
-                matches = np.empty((0, 2), dtype=int)
-            else:
-                matches = np.stack(matches)
+                    matches_list.append([row, valid_idx[col]])
 
-            # Reject matches that imply a large displacement between the
-            # centroid of all valid keypoints and the last confirmed
-            # centroid. This avoids accepting detections whose ellipse fits
-            # drift away from the underlying keypoints.
+            matches = np.asarray(matches_list, dtype=int) if matches_list else np.empty((0, 2), dtype=int)
+
+            # 5) 匹配后复检（再次硬门控，保持同一规则）
             if self.gate_last_position and len(matches):
                 keep = []
                 for det_ind, trk_ind in matches:
                     tracker = self.trackers[trk_ind]
                     prev_centroid = tracker.last_confirmed_centroid
                     det_centroid = centroids[det_ind]
-                    disp = np.linalg.norm(det_centroid - prev_centroid)
-                    dt = min(
-                        max(tracker.time_since_update, 1),
-                        self.max_dt_for_gating,
-                    )
-                    if (
-                        self.max_px_gate is not None and disp > self.max_px_gate * dt
-                    ) or (
-                        self.v_gate_pxpf is not None and disp > self.v_gate_pxpf * dt
-                    ):
+                    disp = float(np.linalg.norm(det_centroid - prev_centroid))
+                    dt = min(max(tracker.time_since_update, 1), self.max_dt_for_gating)
+                    allowed = _allowed_disp(self.max_px_gate, self.v_gate_pxpf, dt)
+                    if allowed is not None and disp > allowed:
                         unmatched_detection_idx.append(det_ind)
                         unmatched_trackers.append(trk_ind)
+                        logger.debug(
+                            "[GATE BLOCK][post] trk=%s dt=%d dist=%.1f allowed=%.1f frame=%s",
+                            tracker.id, dt, disp, allowed, self.n_frames
+                        )
                     else:
                         keep.append([det_ind, trk_ind])
+                        logger.debug(
+                            "[GATE PASS ][post] trk=%s dt=%d dist=%.1f allowed=%.1f frame=%s",
+                            tracker.id, dt, disp, allowed if allowed is not None else float("inf"), self.n_frames
+                        )
                 matches = (
-                    np.asarray(keep, dtype=int)
-                    if len(keep)
-                    else np.empty((0, 2), dtype=int)
+                    np.asarray(keep, dtype=int) if len(keep) else np.empty((0, 2), dtype=int)
                 )
+
             unmatched_trackers = np.unique(unmatched_trackers)
             unmatched_detection_idx = np.unique(unmatched_detection_idx)
             unmatched_detections.extend(det_indices[j] for j in unmatched_detection_idx)
             unmatched_detections = np.unique(unmatched_detections)
 
         if self.verbose:
-            print(
-                f"[frame {self.n_frames}] um_det={unmatched_detections.tolist()}  um_trk={unmatched_trackers.tolist()}"
+            logger.info(
+                "[frame %s] um_det=%s  um_trk=%s",
+                self.n_frames,
+                unmatched_detections.tolist() if len(np.atleast_1d(unmatched_detections)) else [],
+                unmatched_trackers.tolist() if len(np.atleast_1d(unmatched_trackers)) else [],
             )
 
+        # 6) 更新已匹配 tracker
         animalindex = []
         for t, tracker in enumerate(self.trackers):
             if t not in unmatched_trackers:
-                ind = matches[matches[:, 1] == t, 0][0]
-                dt = tracker.time_since_update
-                logger.debug(
-                    "Accepted match for tracker %s at frame %s with dt=%s",
-                    tracker.id,
-                    self.n_frames,
-                    dt,
-                )
-                animalindex.append(det_indices[ind])
-                tracker.update(ellipses[ind].parameters, centroids[ind])
+                # 找到匹配到该全局 tracker 的检测下标
+                if len(matches) == 0:
+                    animalindex.append(-1)
+                    continue
+                idx = np.where(matches[:, 1] == t)[0]
+                if idx.size == 0:
+                    animalindex.append(-1)
+                    continue
+                det_local = matches[idx[0], 0]
+                animalindex.append(det_indices[det_local])
+                tracker.update(ellipses[det_local].parameters, centroids[det_local])
             else:
                 animalindex.append(-1)
 
-        for i in unmatched_detection_idx:
+        # 7) 为未匹配检测创建新 tracker
+        for i in unmatched_detection_idx if 'unmatched_detection_idx' in locals() else []:
             trk = EllipseTracker(ellipses[i].parameters, centroids[i])
-            # Initialize tracker; update occurs on next frame prediction
-            if identities is not None:
-                trk.id_ = mode(identities[det_indices[i]])[0][0]
+            if identities is not None and det_indices[i] < len(identities):
+                try:
+                    trk.id_ = mode(identities[det_indices[i]])[0][0]
+                except Exception:
+                    pass
             self.trackers.append(trk)
             animalindex.append(det_indices[i])
 
+        # 8) 输出
         i = len(self.trackers)
         ret = []
         for trk in reversed(self.trackers):
@@ -647,10 +616,8 @@ class SORTEllipse(SORTBase):
                 trk.hit_streak >= self.min_hits or self.n_frames <= self.min_hits
             ):
                 ret.append(
-                    np.concatenate((d, [trk.id, int(animalindex[i - 1])])).reshape(
-                        1, -1
-                    )
-                )  # for DLC we also return the original animalid
+                    np.concatenate((d, [trk.id, int(animalindex[i - 1])])).reshape(1, -1)
+                )
             i -= 1
             if trk.time_since_update > self.max_age:
                 self.trackers.pop(i)
@@ -671,10 +638,6 @@ class SORTSkeleton(SORTBase):
 
     @staticmethod
     def weighted_hausdorff(x, y):
-        # Modified from scipy source code:
-        # - to restrict its use to 2D
-        # - to get rid of shuffling (since arrays are only (nbodyparts * 3) element long)
-        # TODO - factor in keypoint confidence (and weight by # of observations??)
         cmax = 0
         for i in range(x.shape[0]):
             no_break_occurred = True
@@ -692,13 +655,11 @@ class SORTSkeleton(SORTBase):
 
     @staticmethod
     def object_keypoint_similarity(x, y):
-        mask = ~np.isnan(x * y).all(axis=1)  # Intersection visible keypoints
+        mask = ~np.isnan(x * y).all(axis=1)
         xx = x[mask]
         yy = y[mask]
         dist = np.linalg.norm(xx - yy, axis=1)
-        scale = np.sqrt(
-            np.product(np.ptp(yy, axis=0))
-        )  # square root of bounding box area
+        scale = np.sqrt(np.product(np.ptp(yy, axis=0)))
         oks = np.exp(-0.5 * (dist / (0.05 * scale)) ** 2)
         return np.mean(oks)
 
@@ -730,26 +691,11 @@ class SORTSkeleton(SORTBase):
             pose_ref = tracker.predict()
             poses_ref.append(pose_ref.reshape((-1, 2)))
 
-        # mat = self.calc_pairwise_oks(poses, poses_ref)
         mat = self.calc_pairwise_hausdorff_dist(poses, poses_ref)
         row_indices, col_indices = linear_sum_assignment(mat, maximize=False)
 
         unmatched_poses = [p for p, _ in enumerate(poses) if p not in row_indices]
-        unmatched_trackers = [
-            t for t, _ in enumerate(poses_ref) if t not in col_indices
-        ]
-        # Remove matched detections with low OKS
-        # matches = []
-        # for row, col in zip(row_indices, col_indices):
-        #     if mat[row, col] < self.oks_threshold:
-        #         unmatched_poses.append(row)
-        #         unmatched_trackers.append(col)
-        #     else:
-        #         matches.append([row, col])
-        # if not len(matches):
-        #     matches = np.empty((0, 2), dtype=int)
-        # else:
-        #     matches = np.stack(matches)
+        unmatched_trackers = [t for t, _ in enumerate(poses_ref) if t not in col_indices]
         matches = np.c_[row_indices, col_indices]
 
         animalindex = []
@@ -781,133 +727,8 @@ class SORTSkeleton(SORTBase):
         return np.empty((0, self.n_bodyparts * 2 + 2))
 
 
-class SORTBox(SORTBase):
-    def __init__(self, max_age, min_hits, iou_threshold):
-        self.max_age = max_age
-        self.min_hits = min_hits
-        self.iou_threshold = iou_threshold
-        BoxTracker.n_trackers = 0
-        super().__init__()
-
-    def track(self, dets):
-        self.n_frames += 1
-
-        trackers = np.zeros((len(self.trackers), 5))
-        for i in range(len(trackers)):
-            trackers[i, :4] = self.trackers[i].predict()
-        empty = np.isnan(trackers).any(axis=1)
-        valid_idx = np.flatnonzero(~empty)
-        trackers = trackers[valid_idx]
-
-        matched, unmatched_dets, unmatched_trks = self.match_detections_to_trackers(
-            dets, trackers, self.iou_threshold
-        )
-        unmatched_trks = np.asarray(unmatched_trks, dtype=int).ravel()
-        unmatched_trks = np.r_[np.flatnonzero(empty), valid_idx[unmatched_trks]]
-        if len(matched):
-            matched[:, 1] = valid_idx[matched[:, 1]]
-
-        # update matched trackers with assigned detections
-        animalindex = []
-        for t, trk in enumerate(self.trackers):
-            if t not in unmatched_trks:
-                d = matched[np.where(matched[:, 1] == t)[0], 0]
-                animalindex.append(d[0])
-                trk.update(dets[d, :][0])  # update coordinates
-            else:
-                animalindex.append("nix")  # lost trk!
-
-        # create and initialise new trackers for unmatched detections
-        for i in unmatched_dets:
-            trk = BoxTracker(dets[i, :])
-            self.trackers.append(trk)
-            animalindex.append(i)
-
-        i = len(self.trackers)
-        ret = []
-        for trk in reversed(self.trackers):
-            d = trk.state
-            if (trk.time_since_update < 1) and (
-                trk.hit_streak >= self.min_hits or self.n_frames <= self.min_hits
-            ):
-                ret.append(
-                    np.concatenate((d, [trk.id, int(animalindex[i - 1])])).reshape(
-                        1, -1
-                    )
-                )  # for DLC we also return the original animalid
-                # +1 as MOT benchmark requires positive >> this is removed for DLC!
-            i -= 1
-            # remove dead tracklet
-            if trk.time_since_update > self.max_age:
-                self.trackers.pop(i)
-
-        if len(ret) > 0:
-            return np.concatenate(ret)
-        return np.empty((0, 5))
-
-    @staticmethod
-    def match_detections_to_trackers(detections, trackers, iou_threshold):
-        """
-        Assigns detections to tracked object (both represented as bounding boxes)
-
-        Returns 3 lists of matches, unmatched_detections and unmatched_trackers
-        """
-        if not len(trackers):
-            return (
-                np.empty((0, 2), dtype=int),
-                np.arange(len(detections)),
-                np.empty((0, 5), dtype=int),
-            )
-        iou_matrix = np.zeros((len(detections), len(trackers)), dtype=np.float32)
-
-        for d, det in enumerate(detections):
-            for t, trk in enumerate(trackers):
-                iou_matrix[d, t] = calc_iou(det, trk)
-        row_indices, col_indices = linear_sum_assignment(-iou_matrix)
-
-        unmatched_detections = []
-        for d, det in enumerate(detections):
-            if d not in row_indices:
-                unmatched_detections.append(d)
-        unmatched_trackers = []
-        for t, trk in enumerate(trackers):
-            if t not in col_indices:
-                unmatched_trackers.append(t)
-
-        # filter out matched with low IOU
-        matches = []
-        for row, col in zip(row_indices, col_indices):
-            if iou_matrix[row, col] < iou_threshold:
-                unmatched_detections.append(row)
-                unmatched_trackers.append(col)
-            else:
-                matches.append([row, col])
-        if not len(matches):
-            matches = np.empty((0, 2), dtype=int)
-        else:
-            matches = np.stack(matches)
-        return matches, np.array(unmatched_detections), np.array(unmatched_trackers)
-
-
 def fill_tracklets(tracklets, trackers, animals, imname, time_since_updates=None):
-    """Populate the ``tracklets`` structure with tracker outputs.
-
-    Parameters
-    ----------
-    tracklets: dict
-        Dictionary that stores tracking results.
-    trackers: numpy.ndarray
-        Array returned by the tracker for the current frame.
-    animals: numpy.ndarray
-        Detected animal poses for the current frame.
-    imname: int | str
-        Frame identifier used as key within each tracklet.
-    time_since_updates: dict, optional
-        Mapping from ``tracklet_id`` to ``time_since_update`` of the corresponding
-        tracker. When provided, these values are stored under the
-        ``"time_since_update"`` key in ``tracklets``.
-    """
-
+    """Populate the ``tracklets`` structure with tracker outputs."""
     for content in trackers:
         tracklet_id, pred_id = content[-2:].astype(int)
         if tracklet_id not in tracklets:
@@ -919,7 +740,7 @@ def fill_tracklets(tracklets, trackers, animals, imname, time_since_updates=None
             )
         if pred_id != -1:
             tracklets[tracklet_id][imname] = np.asarray(animals[pred_id])
-        else:  # Resort to the tracker prediction
+        else:  # use tracker prediction
             xy = np.asarray(content[:-2])
             pred = np.insert(xy, range(2, len(xy) + 1, 2), 1)
             tracklets[tracklet_id][imname] = np.asarray(pred)
@@ -935,45 +756,12 @@ def calc_bboxes_from_keypoints(data, slack=0, offset=0):
     bboxes = np.full((data.shape[0], 5), np.nan)
     bboxes[:, :2] = np.nanmin(data[..., :2], axis=1) - slack  # X1, Y1
     bboxes[:, 2:4] = np.nanmax(data[..., :2], axis=1) + slack  # X2, Y2
-    bboxes[:, -1] = np.nanmean(data[..., 2], axis=1)  # Average confidence
+    bboxes[:, -1] = np.nanmean(data[..., 2], axis=1)  # mean confidence
     bboxes[:, [0, 2]] += offset
     return bboxes
 
 
 def reconstruct_all_ellipses(data, sd):
-    """
-    Reconstructs ellipses for multiple individuals based on their body part coordinates
-    across multiple frames. Each ellipse is fitted to the coordinates using an `EllipseFitter`.
-
-    Parameters
-    ----------
-    data : pandas.DataFrame
-        A multi-level DataFrame containing body part coordinates and likelihood values.
-        The index represents frames, and the columns follow a multi-level structure:
-        - Level 0: Scorer
-        - Level 1: Individuals
-        - Level 2: Body parts
-        - Level 3: Coordinates ("x" and "y") and "likelihood".
-    sd : float
-        The standard deviation used by the `EllipseFitter` for fitting ellipses.
-
-    Returns
-    -------
-    numpy.ndarray
-        A 3D array of shape (A, F, 5), where:
-        - A is the number of individuals (excluding "single" if present).
-        - F is the number of frames.
-        - Each row contains ellipse parameters [cx, cy, width, height, angle].
-
-    Notes
-    -----
-    - The method drops the "likelihood" column from the input DataFrame as it is not
-      relevant for ellipse fitting.
-    - If the "single" individual is present, it is excluded from the reconstruction process.
-    - The `EllipseFitter` is used to fit ellipses to the body part coordinates for each
-      individual in each frame.
-    - NaN values are assigned when no valid ellipse can be fitted.
-    """
     xy = data.droplevel("scorer", axis=1).drop("likelihood", axis=1, level=-1)
     if "single" in xy:
         xy.drop("single", axis=1, level="individuals", inplace=True)
@@ -982,8 +770,8 @@ def reconstruct_all_ellipses(data, sd):
     ellipses = np.full((len(animals), nrows, 5), np.nan)
     fitter = EllipseFitter(sd)
     for n, animal in enumerate(animals):
-        data = xy.xs(animal, axis=1, level="individuals").values.reshape((nrows, -1, 2))
-        for i, coords in enumerate(tqdm(data)):
+        _data = xy.xs(animal, axis=1, level="individuals").values.reshape((nrows, -1, 2))
+        for i, coords in enumerate(tqdm(_data)):
             el = fitter.fit(coords.astype(np.float64))
             if el is not None:
                 ellipses[n, i] = el.parameters
@@ -991,12 +779,7 @@ def reconstruct_all_ellipses(data, sd):
 
 
 def compute_v_gate_pxpf(v_gate_cms=None, px_per_cm=None, fps=None):
-    """Return velocity gate in pixels per frame.
-
-    The resulting threshold expresses the maximum allowed displacement for a
-    single frame. It is scaled by the number of frames elapsed (``dt``) when
-    used during gating.
-    """
+    """Return velocity gate in pixels per frame (px/frame)."""
     try:
         if v_gate_cms is not None and px_per_cm is not None and fps is not None:
             if v_gate_cms > 0 and px_per_cm > 0 and fps > 0:
@@ -1004,3 +787,4 @@ def compute_v_gate_pxpf(v_gate_cms=None, px_per_cm=None, fps=None):
     except Exception:
         pass
     return None
+
