@@ -413,10 +413,11 @@ class SORTBase(metaclass=abc.ABCMeta):
 
 
 class SORTEllipse(SORTBase):
-    def __init__(self, max_age, min_hits, iou_threshold, sd=2):
+    def __init__(self, max_age, min_hits, iou_threshold, sd=2, max_jump=None):
         self.max_age = max_age
         self.min_hits = min_hits
         self.iou_threshold = iou_threshold
+        self.max_jump = max_jump
         self.fitter = EllipseFitter(sd)
         EllipseTracker.n_trackers = 0
         super().__init__()
@@ -434,10 +435,12 @@ class SORTEllipse(SORTBase):
 
         ellipses = []
         pred_ids = []
+        centroids = []
         for i, pose in enumerate(poses):
             el = self.fitter.fit(pose)
             if el is not None:
                 ellipses.append(el)
+                centroids.append(np.nanmean(pose, axis=0))
                 if identities is not None:
                     pred_ids.append(mode(identities[i])[0][0])
         if not len(trackers):
@@ -447,8 +450,13 @@ class SORTEllipse(SORTBase):
         else:
             ellipses_trackers = [Ellipse(*t[:5]) for t in trackers]
             cost_matrix = np.zeros((len(ellipses), len(ellipses_trackers)))
+            tracker_centroids = trackers[:, :2]
             for i, el in enumerate(ellipses):
                 for j, el_track in enumerate(ellipses_trackers):
+                    if self.max_jump is not None:
+                        dist = np.linalg.norm(centroids[i] - tracker_centroids[j])
+                        if dist > self.max_jump:
+                            continue
                     cost = el.calc_similarity_with(el_track)
                     if identities is not None:
                         match = 2 if pred_ids[i] == self.trackers[j].id_ else 1
