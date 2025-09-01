@@ -10,6 +10,7 @@
 #
 
 import abc
+import logging
 import math
 import warnings
 from collections import defaultdict
@@ -25,6 +26,8 @@ from scipy.stats import mode
 from tqdm import tqdm
 
 warnings.simplefilter("ignore", category=NumbaPerformanceWarning)
+
+logger = logging.getLogger(__name__)
 
 TRACK_METHODS = {
     "box": "_bx",
@@ -454,6 +457,18 @@ class SORTEllipse(SORTBase):
         self.gate_last_position = gate_last_position
         EllipseTracker.n_trackers = 0
         super().__init__()
+        logger.info(
+            (
+                "SORTEllipse initialized with max_px_gate=%s, v_gate_pxpf=%s, "
+                "gate_last_position=%s, max_age=%s, min_hits=%s, iou_threshold=%s"
+            ),
+            self.max_px_gate,
+            self.v_gate_pxpf,
+            self.gate_last_position,
+            self.max_age,
+            self.min_hits,
+            self.iou_threshold,
+        )
 
     def track(self, poses, identities=None):
         self.n_frames += 1
