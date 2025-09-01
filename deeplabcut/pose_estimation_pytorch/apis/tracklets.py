@@ -208,7 +208,6 @@ def build_tracklets(
             inference_cfg.get("max_age", 1),
             inference_cfg.get("min_hits", 1),
             inference_cfg.get("iou_threshold", 0.6),
-            max_jump=inference_cfg.get("max_jump"),
         )
 
     tracklets = {}

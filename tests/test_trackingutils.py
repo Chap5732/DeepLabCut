@@ -63,20 +63,6 @@ def test_sort_ellipse():
     assert all(np.array_equal(tracklets[n][0], pose) for n, pose in enumerate(poses))
 
 
-def test_sort_ellipse_max_jump():
-    base = np.asarray(
-        [[0, 0], [1, 0], [-1, 0], [0, 1], [0, -1], [1, 1]], dtype=float
-    )
-    mot_tracker = trackingutils.SORTEllipse(1, 1, 0.1, max_jump=10)
-    mot_tracker.track(base[None])
-    mot_tracker.track((base + np.array([1, 0]))[None])
-    assert len(mot_tracker.trackers) == 1
-    mot_tracker = trackingutils.SORTEllipse(1, 1, 0.1, max_jump=10)
-    mot_tracker.track(base[None])
-    mot_tracker.track((base + np.array([100, 0]))[None])
-    assert len(mot_tracker.trackers) == 2
-
-
 def test_tracking_ellipse(real_assemblies, real_tracklets):
     tracklets_ref = real_tracklets.copy()
     _ = tracklets_ref.pop("header", None)
