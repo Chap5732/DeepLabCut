@@ -583,6 +583,13 @@ class SORTEllipse(SORTBase):
         for t, tracker in enumerate(self.trackers):
             if t not in unmatched_trackers:
                 ind = matches[matches[:, 1] == t, 0][0]
+                dt = tracker.time_since_update
+                logger.debug(
+                    "Accepted match for tracker %s at frame %s with dt=%s",
+                    tracker.id,
+                    self.n_frames,
+                    dt,
+                )
                 animalindex.append(ind)
                 tracker.update(ellipses[ind].parameters)
             else:
