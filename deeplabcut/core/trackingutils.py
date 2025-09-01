@@ -165,15 +165,19 @@ class Ellipse:
 
 
 class EllipseFitter:
-    def __init__(self, sd=2):
+    def __init__(self, sd=2, min_n_valid=None):
         self.sd = sd
+        self.min_n_valid = min_n_valid
         self.x = None
         self.y = None
         self.params = None
         self._coeffs = None
 
     def fit(self, xy):
-        self.x, self.y = xy[np.isfinite(xy).all(axis=1)].T
+        mask = np.isfinite(xy).all(axis=1)
+        if self.min_n_valid is not None and mask.sum() < self.min_n_valid:
+            return None
+        self.x, self.y = xy[mask].T
         if len(self.x) < 3:
             return None
         if self.sd:
@@ -450,11 +454,12 @@ class SORTEllipse(SORTBase):
         verbose=False,
         gate_last_position=True,
         max_dt_for_gating=5,
+        min_n_valid=None,
     ):
         self.max_age = max_age
         self.min_hits = min_hits
         self.iou_threshold = iou_threshold
-        self.fitter = EllipseFitter(sd)
+        self.fitter = EllipseFitter(sd, min_n_valid)
         self.max_px_gate = max_px_gate
         # Maximum allowed velocity in pixels per frame. The effective
         # displacement gate is this value scaled by the number of frames
@@ -465,12 +470,13 @@ class SORTEllipse(SORTBase):
         # Cap on how many frames since the last update can widen the gate.
         # Typical values are between 1 and 5 frames.
         self.max_dt_for_gating = max_dt_for_gating
+        self.min_n_valid = min_n_valid
         EllipseTracker.n_trackers = 0
         super().__init__()
         logger.info(
             (
                 "SORTEllipse initialized with max_px_gate=%s, v_gate_pxpf=%s, "
-                "gate_last_position=%s, max_dt_for_gating=%s, max_age=%s, min_hits=%s, iou_threshold=%s"
+                "gate_last_position=%s, max_dt_for_gating=%s, max_age=%s, min_hits=%s, iou_threshold=%s, min_n_valid=%s"
             ),
             self.max_px_gate,
             self.v_gate_pxpf,
@@ -479,6 +485,7 @@ class SORTEllipse(SORTBase):
             self.max_age,
             self.min_hits,
             self.iou_threshold,
+            self.min_n_valid,
         )
 
     def track(self, poses, identities=None):
