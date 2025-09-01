@@ -285,6 +285,24 @@ python scripts/run_make_video.py video.mp4 reconstructed.pickle readers_centers.
 - `TAG_HOLD_FRAMES`：RFID 标签显示持续帧数
 - `MAX_FRAMES`：最大输出帧数（`None` 表示全部）
 
+### `inference_cfg` 推理参数
+`pcutoff`、`topktoretain`、`max_age`、`iou_threshold`、`velocity_gate_cms`、
+`px_per_cm`、`fps`、`max_px_gate` 和 `gate_last_position` 必须写入项目
+`config.yaml` 的 `inference_cfg` 节，否则速度/空间门控将不会生效。示例：
+
+```yaml
+inference_cfg:
+  pcutoff: 0.5            # 示例值
+  topktoretain: 5
+  max_age: 30
+  iou_threshold: 0.3
+  velocity_gate_cms: 25.0
+  px_per_cm: 2.5
+  fps: 30
+  max_px_gate: 50
+  gate_last_position: true
+```
+
 ### match_rfid_to_tracklets 参数
 - `MRT_PICKLE_PATH` / `MRT_RFID_CSV` / `MRT_CENTERS_TXT` / `MRT_TS_CSV` / `MRT_OUT_DIR`
 - `MRT_HIT_RADIUS_PX`、`MRT_AMBIG_MARGIN_PX`、`MRT_TAG_CONFIDENCE_THRESHOLD` 等匹配门槛
@@ -377,4 +395,6 @@ DRAW_READERS: false
 - 使用前需要根据实际数据路径修改 `config.py`
 - 确保输入的 pickle 文件包含正确的 DLC tracklet 数据结构
 - ROI 文件格式目前只支持 polygon 类型的 JSON 格式
-- 运行管线后请确认日志中出现 “Velocity gating enabled...” 与 “Spatial gating enabled...” 信息；如未见此类输出，说明门控参数缺失或配置错误
+- 运行 `run_pipeline.py` 或 `convert_detection2tracklets.py` 时请关注启动日志：
+  - 首先应看到类似 `inference_cfg: {...}` 的输出，确认 `config.yaml` 中的 `inference_cfg` 已正确加载；
+  - 随后日志中应出现 “Velocity gating enabled...” 或 “Spatial gating enabled...” 信息，若缺失则表示门控参数缺失或配置错误
