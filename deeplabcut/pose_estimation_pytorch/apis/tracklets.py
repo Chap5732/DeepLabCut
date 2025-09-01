@@ -244,6 +244,7 @@ def build_tracklets(
             max_px_gate=max_px_gate,
             v_gate_pxpf=v_gate_pxpf,
             gate_last_position=inference_cfg.get("gate_last_position", True),
+            max_dt_for_gating=inference_cfg.get("max_dt_for_gating", 5),
         )
 
     tracklets = {}

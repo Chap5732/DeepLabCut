@@ -443,6 +443,7 @@ class SORTEllipse(SORTBase):
         v_gate_pxpf=None,
         verbose=False,
         gate_last_position=True,
+        max_dt_for_gating=5,
     ):
         self.max_age = max_age
         self.min_hits = min_hits
@@ -455,16 +456,20 @@ class SORTEllipse(SORTBase):
         self.v_gate_pxpf = v_gate_pxpf
         self.verbose = verbose
         self.gate_last_position = gate_last_position
+        # Cap on how many frames since the last update can widen the gate.
+        # Typical values are between 1 and 5 frames.
+        self.max_dt_for_gating = max_dt_for_gating
         EllipseTracker.n_trackers = 0
         super().__init__()
         logger.info(
             (
                 "SORTEllipse initialized with max_px_gate=%s, v_gate_pxpf=%s, "
-                "gate_last_position=%s, max_age=%s, min_hits=%s, iou_threshold=%s"
+                "gate_last_position=%s, max_dt_for_gating=%s, max_age=%s, min_hits=%s, iou_threshold=%s"
             ),
             self.max_px_gate,
             self.v_gate_pxpf,
             self.gate_last_position,
+            self.max_dt_for_gating,
             self.max_age,
             self.min_hits,
             self.iou_threshold,
@@ -508,7 +513,7 @@ class SORTEllipse(SORTBase):
                         dist = math.hypot(el.x - el_last.x, el.y - el_last.y)
                     else:
                         dist = math.hypot(el.x - el_track.x, el.y - el_track.y)
-                    dt = max(tracker.time_since_update, 1)
+                    dt = min(max(tracker.time_since_update, 1), self.max_dt_for_gating)
                     if self.max_px_gate is not None and dist > self.max_px_gate * dt:
                         # Use a large negative number so the Hungarian algorithm never selects this pair
                         cost_matrix[i, j] = -1e6
@@ -555,7 +560,10 @@ class SORTEllipse(SORTBase):
                         ellipses[det_ind].x - prev[0],
                         ellipses[det_ind].y - prev[1],
                     )
-                    dt = max(self.trackers[trk_ind].time_since_update, 1)
+                    dt = min(
+                        max(self.trackers[trk_ind].time_since_update, 1),
+                        self.max_dt_for_gating,
+                    )
                     if (
                         self.max_px_gate is not None and disp > self.max_px_gate * dt
                     ) or (
