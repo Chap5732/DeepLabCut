@@ -4,8 +4,13 @@
 from __future__ import annotations
 
 import argparse
+import logging
 
 from deeplabcut.rfid_tracking.reconstruct_from_pickle import main as reconstruct
+
+
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
 
 
 def build_argparser() -> argparse.ArgumentParser:
@@ -29,6 +34,7 @@ def build_argparser() -> argparse.ArgumentParser:
 
 def main() -> None:
     args = build_argparser().parse_args()
+    logger.info("Arguments: %s", args)
     reconstruct(
         pickle_in=args.pickle_in,
         pickle_out=args.pickle_out,

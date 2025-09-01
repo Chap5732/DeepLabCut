@@ -9,8 +9,13 @@ If your model used a different shuffle index, pass it explicitly via the
 from __future__ import annotations
 
 import argparse
+import logging
 
 from deeplabcut.rfid_tracking.pipeline import run_pipeline
+
+
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
 
 
 def build_argparser() -> argparse.ArgumentParser:
@@ -58,6 +63,7 @@ def build_argparser() -> argparse.ArgumentParser:
 
 def main() -> None:
     args = build_argparser().parse_args()
+    logger.info("Arguments: %s", args)
     run_pipeline(**vars(args))
 
 

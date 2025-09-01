@@ -4,9 +4,14 @@
 from __future__ import annotations
 
 import argparse
+import logging
 
 from deeplabcut.rfid_tracking import config as cfg
 from deeplabcut.rfid_tracking.match_rfid_to_tracklets import main as match_rfid
+
+
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
 
 
 def build_argparser() -> argparse.ArgumentParser:
@@ -34,6 +39,7 @@ def build_argparser() -> argparse.ArgumentParser:
 
 def main() -> None:
     args = build_argparser().parse_args()
+    logger.info("Arguments: %s", args)
     match_rfid(
         pickle_path=args.pickle_path,
         rfid_csv=args.rfid_csv,
