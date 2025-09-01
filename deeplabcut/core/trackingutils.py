@@ -432,6 +432,50 @@ class SORTBase(metaclass=abc.ABCMeta):
         pass
 
 
+def _fallback_center(pose):
+    """Return a center for an animal pose.
+
+    Parameters
+    ----------
+    pose : array-like, shape (n_keypoints, 2) or (n_keypoints, 3)
+        Pose coordinates. When three columns are provided, the last column is
+        interpreted as a confidence value.
+
+    Returns
+    -------
+    numpy.ndarray or None
+        The ``(x, y)`` coordinates of the center or ``None`` when it cannot be
+        determined.
+    """
+
+    pose = np.asarray(pose)
+    if pose.ndim != 2 or pose.shape[1] < 2:
+        return None
+
+    # Prefer an explicit mouse_center keypoint when available. By convention it
+    # is assumed to be the first keypoint in ``pose``.
+    mc = pose[0]
+    if np.isfinite(mc[:2]).all() and (pose.shape[1] < 3 or np.isfinite(mc[2])):
+        return mc[:2]
+
+    # Fall back to a confidence-weighted centroid of the remaining keypoints
+    xy = pose[:, :2]
+    if pose.shape[1] >= 3:
+        lk = pose[:, 2]
+        mask = np.isfinite(xy).all(axis=1) & np.isfinite(lk)
+        if np.any(mask):
+            w = lk[mask]
+            wsum = np.nansum(w)
+            if wsum > 0:
+                return np.nansum(xy[mask] * w[:, None], axis=0) / wsum
+
+    # If no likelihoods are provided, resort to a simple mean
+    center = np.nanmean(xy, axis=0)
+    if np.isfinite(center).all():
+        return center
+    return None
+
+
 class SORTEllipse(SORTBase):
     def __init__(
         self,
@@ -488,10 +532,10 @@ class SORTEllipse(SORTBase):
 
         ellipses, pred_ids = [], []
         for i, pose in enumerate(poses):
-            el = self.fitter.fit(pose)
+            el = self.fitter.fit(pose[..., :2])
             if el is None:
-                center = np.nanmean(pose, axis=0)
-                if np.isfinite(center).all():
+                center = _fallback_center(pose)
+                if center is not None and np.isfinite(center).all():
                     el = Ellipse(center[0], center[1], 1.0, 1.0, 0.0)
             if el is not None:
                 ellipses.append(el)
