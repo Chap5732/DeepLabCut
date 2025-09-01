@@ -312,11 +312,18 @@ class EllipseTracker(BaseTracker):
         performed using the last confirmed position. The centroid of the
         observation is also stored for future distance gating.
         """
+        centroid = np.asarray(centroid)
+        if np.isnan(centroid).any():
+            # Update the Kalman filter state without confirming the centroid.
+            self.kf.update(np.asarray(params))
+            self.time_since_update += 1
+            return
+
         super().update(np.asarray(params))
         # After a successful update, synchronise the last confirmed state and
         # centroid.
         self.last_confirmed_state = self.state.copy()
-        self.last_confirmed_centroid = np.asarray(centroid).copy()
+        self.last_confirmed_centroid = centroid.copy()
 
 
 class SkeletonTracker(BaseTracker):

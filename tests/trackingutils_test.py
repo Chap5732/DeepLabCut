@@ -61,6 +61,18 @@ def test_ellipse_tracker(ellipse):
     assert tracker1.hit_streak == 0
 
 
+def test_ellipse_tracker_nan_centroid(ellipse):
+    centroid = (ellipse.x, ellipse.y)
+    tracker = trackingutils.EllipseTracker(ellipse.parameters, centroid)
+    tracker.update(ellipse.parameters, centroid)
+    prev_state = tracker.last_confirmed_state.copy()
+    prev_centroid = tracker.last_confirmed_centroid.copy()
+    tracker.update(ellipse.parameters, (np.nan, centroid[1]))
+    assert tracker.time_since_update == 1
+    np.testing.assert_array_equal(tracker.last_confirmed_state, prev_state)
+    np.testing.assert_array_equal(tracker.last_confirmed_centroid, prev_centroid)
+
+
 def test_sort_ellipse():
     tracklets = dict()
     mot_tracker = trackingutils.SORTEllipse(1, 1, 0.6)
