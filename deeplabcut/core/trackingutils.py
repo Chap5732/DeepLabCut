@@ -493,17 +493,27 @@ class SORTEllipse(SORTBase):
         unmatched_trackers = np.flatnonzero(empty).tolist()
 
         ellipses, centroids, pred_ids = [], [], []
+        unmatched_detections = []
+        det_indices = []
         for i, pose in enumerate(poses):
             el = self.fitter.fit(pose)
             if el is not None:
+                centroid = np.nanmean(pose[:, :2], axis=0)
+                if np.isnan(centroid).any():
+                    unmatched_detections.append(i)
+                    continue
                 ellipses.append(el)
-                centroids.append(np.nanmean(pose[:, :2], axis=0))
+                centroids.append(centroid)
+                det_indices.append(i)
                 if identities is not None:
                     pred_ids.append(mode(identities[i])[0][0])
 
         if not len(trackers):
             matches = np.empty((0, 2), dtype=int)
-            unmatched_detections = np.arange(len(ellipses))
+            unmatched_detection_idx = list(range(len(ellipses)))
+            unmatched_detections.extend(det_indices[j] for j in unmatched_detection_idx)
+            unmatched_detections = np.array(unmatched_detections, dtype=int)
+            unmatched_detection_idx = np.array(unmatched_detection_idx, dtype=int)
             unmatched_trackers = np.array(unmatched_trackers, dtype=int)
         else:
             ellipses_trackers = [Ellipse(*t[:5]) for t in trackers]
@@ -540,7 +550,7 @@ class SORTEllipse(SORTBase):
                         cost *= match
                     cost_matrix[i, j] = cost
             row_indices, col_indices = linear_sum_assignment(cost_matrix, maximize=True)
-            unmatched_detections = [
+            unmatched_detection_idx = [
                 i for i, _ in enumerate(ellipses) if i not in row_indices
             ]
             unmatched_trackers.extend(
@@ -550,7 +560,7 @@ class SORTEllipse(SORTBase):
             for row, col in zip(row_indices, col_indices):
                 val = cost_matrix[row, col]
                 if val < self.iou_threshold:
-                    unmatched_detections.append(row)
+                    unmatched_detection_idx.append(row)
                     unmatched_trackers.append(valid_idx[col])
                 else:
                     matches.append([row, valid_idx[col]])
@@ -580,7 +590,7 @@ class SORTEllipse(SORTBase):
                     ) or (
                         self.v_gate_pxpf is not None and disp > self.v_gate_pxpf * dt
                     ):
-                        unmatched_detections.append(det_ind)
+                        unmatched_detection_idx.append(det_ind)
                         unmatched_trackers.append(trk_ind)
                     else:
                         keep.append([det_ind, trk_ind])
@@ -589,8 +599,9 @@ class SORTEllipse(SORTBase):
                     if len(keep)
                     else np.empty((0, 2), dtype=int)
                 )
-
             unmatched_trackers = np.unique(unmatched_trackers)
+            unmatched_detection_idx = np.unique(unmatched_detection_idx)
+            unmatched_detections.extend(det_indices[j] for j in unmatched_detection_idx)
             unmatched_detections = np.unique(unmatched_detections)
 
         if self.verbose:
@@ -609,18 +620,18 @@ class SORTEllipse(SORTBase):
                     self.n_frames,
                     dt,
                 )
-                animalindex.append(ind)
+                animalindex.append(det_indices[ind])
                 tracker.update(ellipses[ind].parameters, centroids[ind])
             else:
                 animalindex.append(-1)
 
-        for i in unmatched_detections:
+        for i in unmatched_detection_idx:
             trk = EllipseTracker(ellipses[i].parameters, centroids[i])
             # Initialize tracker; update occurs on next frame prediction
             if identities is not None:
-                trk.id_ = mode(identities[i])[0][0]
+                trk.id_ = mode(identities[det_indices[i]])[0][0]
             self.trackers.append(trk)
-            animalindex.append(i)
+            animalindex.append(det_indices[i])
 
         i = len(self.trackers)
         ret = []
