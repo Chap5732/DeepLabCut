@@ -135,6 +135,21 @@ def run_pipeline(
     dest = Path(destfolder) if destfolder else video_path.parent
     videotype = video_path.suffix.lstrip(".")
 
+    # Load project config and prepare inference settings
+    dlc_cfg = aux.read_config(config_path)
+    inference_cfg = (
+        dlc_cfg.get("inference_cfg") or dlc_cfg.get("inferencecfg") or {}
+    ).copy()
+    gate_params = {
+        "velocity_gate_cms": getattr(cfg, "V_GATE_CMS", None),
+        "px_per_cm": getattr(cfg, "PX_PER_CM", None),
+        "fps": getattr(cfg, "FPS", None),
+        "max_px_gate": getattr(cfg, "MAX_PX_GATE", None),
+    }
+    for key, val in gate_params.items():
+        if val is not None:
+            inference_cfg.setdefault(key, val)
+
     # 1) run inference to create assemblies without auto tracking
     logger.info(
         "Starting video analysis: %s (shuffle=%s, trainingsetindex=%s)",
@@ -175,11 +190,11 @@ def run_pipeline(
         trainingsetindex=trainingsetindex,
         track_method=track_method,
         destfolder=str(dest),
+        inferencecfg=inference_cfg,
     )
     logger.info("Finished converting detections to tracklets for %s", video_path)
 
     # Locate the generated tracklet pickle
-    dlc_cfg = aux.read_config(config_path)
     train_fraction = dlc_cfg["TrainingFraction"][trainingsetindex]
     dlc_scorer = get_scorer_name(dlc_cfg, shuffle, train_fraction)[0]
     method_suffix = {"ellipse": "el", "box": "bx"}.get(track_method, "sk")
