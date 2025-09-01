@@ -86,6 +86,24 @@ def _ellipse_pose(offset):
     return base + np.asarray(offset)
 
 
+def test_fallback_center_mouse_center():
+    pose = np.array(
+        [[1.0, 2.0, 0.9], [0.0, 0.0, 0.5], [2.0, 0.0, 0.5]],
+        dtype=float,
+    )
+    center = trackingutils._fallback_center(pose)
+    np.testing.assert_allclose(center, [1.0, 2.0])
+
+
+def test_fallback_center_weighted_centroid():
+    pose = np.array(
+        [[np.nan, np.nan, np.nan], [0.0, 0.0, 0.5], [10.0, 0.0, 1.0]],
+        dtype=float,
+    )
+    center = trackingutils._fallback_center(pose)
+    np.testing.assert_allclose(center, [10.0 / 1.5, 0.0])
+
+
 @pytest.mark.parametrize("gate_kwargs", [{"max_px_gate": 5}, {"v_gate_pxpf": 5}])
 def test_sort_ellipse_gates_zero_iou(gate_kwargs):
     mot_tracker = trackingutils.SORTEllipse(5, 1, 0, **gate_kwargs)
