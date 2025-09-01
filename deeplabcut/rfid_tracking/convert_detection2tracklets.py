@@ -10,6 +10,7 @@ from pathlib import Path
 from typing import Optional
 
 import click
+
 import deeplabcut as dlc
 from deeplabcut.utils import auxiliaryfunctions as aux
 
@@ -32,15 +33,21 @@ def collect_videos(input_path: str, videotype: Optional[str]):
     else:
         vids = [str(p)]
     if not vids:
-        raise FileNotFoundError(
-            f"在 {input_path} 下未找到视频（后缀：{videotype or '常见扩展'}）"
-        )
+        raise FileNotFoundError(f"在 {input_path} 下未找到视频（后缀：{videotype or '常见扩展'}）")
     return vids
 
 
 @click.command(context_settings={"help_option_names": ["-h", "--help"]})
-@click.option("--config-path", type=click.Path(exists=True, dir_okay=False), help="项目 config.yaml 路径")
-@click.option("--track-method", type=click.Choice(["ellipse", "skeleton", "box"]), help="tracklet 匹配方法")
+@click.option(
+    "--config-path",
+    type=click.Path(exists=True, dir_okay=False),
+    help="项目 config.yaml 路径",
+)
+@click.option(
+    "--track-method",
+    type=click.Choice(["ellipse", "skeleton", "box"]),
+    help="tracklet 匹配方法",
+)
 @click.option("--shuffle", type=int, help="训练 shuffle 编号")
 @click.option("--destfolder", type=click.Path(), help="输出目录")
 @click.option("--video-input", type=click.Path(), help="视频文件或目录")
@@ -52,7 +59,9 @@ def collect_videos(input_path: str, videotype: Optional[str]):
     show_default=True,
     help="默认参数 YAML 文件",
 )
-def main(config_path, track_method, shuffle, destfolder, video_input, videotype, defaults):
+def main(
+    config_path, track_method, shuffle, destfolder, video_input, videotype, defaults
+):
     defaults_dict = {}
     if defaults and Path(defaults).is_file():
         defaults_dict = aux.read_config(defaults)
@@ -74,18 +83,30 @@ def main(config_path, track_method, shuffle, destfolder, video_input, videotype,
 
     try:
         cfg = aux.read_config(config_path)
-        base_inferencecfg = (cfg.get("inference_cfg") or cfg.get("inferencecfg") or {}).copy()
+        base_inferencecfg = (
+            cfg.get("inference_cfg") or cfg.get("inferencecfg") or {}
+        ).copy()
     except Exception:
         base_inferencecfg = {}
 
     if not base_inferencecfg:
         base_inferencecfg = {
-            "variant": "paf",                # 组装方式（常见）
-            "method": "munkres",             # 匹配方法（匈牙利）
-            "pafthreshold": 0.05,            # PAF 连接阈值（保守默认）
-            "minimalnumberofconnections": 1, # 骨架最小连接数
-            "withid": False,                 # 若关键点含 identity 通道才需 True；一般 False
+            "variant": "paf",  # 组装方式（常见）
+            "method": "munkres",  # 匹配方法（匈牙利）
+            "pafthreshold": 0.05,  # PAF 连接阈值（保守默认）
+            "minimalnumberofconnections": 1,  # 骨架最小连接数
+            "withid": False,  # 若关键点含 identity 通道才需 True；一般 False
         }
+
+    print(f"[INFO] inferencecfg: {base_inferencecfg}")
+    max_px_gate = base_inferencecfg.get("max_px_gate")
+    velocity_gate_cms = base_inferencecfg.get("velocity_gate_cms")
+    px_per_cm = base_inferencecfg.get("px_per_cm")
+    fps = base_inferencecfg.get("fps")
+    print(
+        f"[INFO] gating: max_px_gate={max_px_gate}, "
+        f"velocity_gate_cms={velocity_gate_cms}, px_per_cm={px_per_cm}, fps={fps}"
+    )
 
     dlc.convert_detections2tracklets(
         config=config_path,
