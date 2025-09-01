@@ -861,11 +861,34 @@ class SORTBox(SORTBase):
         return matches, np.array(unmatched_detections), np.array(unmatched_trackers)
 
 
-def fill_tracklets(tracklets, trackers, animals, imname):
+def fill_tracklets(tracklets, trackers, animals, imname, time_since_updates=None):
+    """Populate the ``tracklets`` structure with tracker outputs.
+
+    Parameters
+    ----------
+    tracklets: dict
+        Dictionary that stores tracking results.
+    trackers: numpy.ndarray
+        Array returned by the tracker for the current frame.
+    animals: numpy.ndarray
+        Detected animal poses for the current frame.
+    imname: int | str
+        Frame identifier used as key within each tracklet.
+    time_since_updates: dict, optional
+        Mapping from ``tracklet_id`` to ``time_since_update`` of the corresponding
+        tracker. When provided, these values are stored under the
+        ``"time_since_update"`` key in ``tracklets``.
+    """
+
     for content in trackers:
         tracklet_id, pred_id = content[-2:].astype(int)
         if tracklet_id not in tracklets:
             tracklets[tracklet_id] = {}
+        if time_since_updates is not None:
+            tsu = tracklets.setdefault("time_since_update", {})
+            tsu.setdefault(tracklet_id, {})[imname] = time_since_updates.get(
+                tracklet_id, np.nan
+            )
         if pred_id != -1:
             tracklets[tracklet_id][imname] = np.asarray(animals[pred_id])
         else:  # Resort to the tracker prediction

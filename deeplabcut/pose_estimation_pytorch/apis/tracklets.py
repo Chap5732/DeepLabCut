@@ -306,6 +306,7 @@ def build_tracklets(
 
                 inds = linear_sum_assignment(mat, maximize=True)
                 trackers = np.c_[inds][:, ::-1]
+                time_since_updates = None
             else:
                 if track_method == "box":
                     xy = trackingutils.calc_bboxes_from_keypoints(
@@ -313,11 +314,19 @@ def build_tracklets(
                     )  # TODO: get cropping parameters and utilize!
                 else:
                     xy = animals[:, keep_inds, :2]
+                pre_tsu = {
+                    trk.id: trk.time_since_update for trk in mot_tracker.trackers
+                }
                 trackers = mot_tracker.track(xy)
+                time_since_updates = {
+                    trk.id: pre_tsu.get(trk.id, 0) for trk in mot_tracker.trackers
+                }
 
             strwidth = int(np.ceil(np.log10(num_frames)))
             imname = "frame" + str(index).zfill(strwidth)
-            trackingutils.fill_tracklets(tracklets, trackers, animals, imname)
+            trackingutils.fill_tracklets(
+                tracklets, trackers, animals, imname, time_since_updates
+            )
 
     return tracklets
 
