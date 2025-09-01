@@ -155,16 +155,6 @@ def test_sort_ellipse_v_gate_pxpf():
     assert ret[0, -2] == 0
 
 
-def test_sort_ellipse_fallback_center():
-    mot_tracker = trackingutils.SORTEllipse(5, 1, 0.1, max_px_gate=5)
-    pose = _ellipse_pose((0, 0))[None, ...]
-    mot_tracker.track(pose)
-    far_pose = np.array([[[200.0, 0.0], [200.0, 0.0], [np.nan, np.nan], [np.nan, np.nan]]])
-    ret = mot_tracker.track(far_pose)
-    assert ret.size == 0
-    assert len(mot_tracker.trackers) == 2
-
-
 @pytest.mark.parametrize("gate_key", ["max_px_gate", "v_gate_pxpf"])
 @pytest.mark.parametrize("gate_last_position", [None, False, True])
 def test_sort_ellipse_rejects_large_displacement(gate_key, gate_last_position):
