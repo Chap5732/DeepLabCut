@@ -1463,6 +1463,7 @@ def _convert_detections_to_tracklets(
             inference_cfg.get("max_age", 1),
             inference_cfg.get("min_hits", 1),
             inference_cfg.get("iou_threshold", 0.6),
+            max_jump=inference_cfg.get("max_jump"),
         )
     tracklets = {}
 
@@ -1756,6 +1757,7 @@ def convert_detections2tracklets(
                         inferencecfg.get("max_age", 1),
                         inferencecfg.get("min_hits", 1),
                         inferencecfg.get("iou_threshold", 0.6),
+                        max_jump=inferencecfg.get("max_jump"),
                     )
                 tracklets = {}
                 multi_bpts = cfg["multianimalbodyparts"]
