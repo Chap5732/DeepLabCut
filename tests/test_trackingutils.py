@@ -46,6 +46,10 @@ def test_ellipse_fitter():
     fitter.sd = 0
     el = fitter.fit(xy)
     assert np.isclose(el.parameters, [0, 0, 4, 2, 0]).all()
+    fitter = trackingutils.EllipseFitter(min_n_valid=5)
+    assert fitter.fit(xy) is None
+    xy5 = np.vstack([xy, [0, 0]])
+    assert fitter.fit(xy5) is not None
 
 
 def test_ellipse_tracker(ellipse):
@@ -80,6 +84,14 @@ def test_sort_ellipse():
     assert all(
         tracklets["time_since_update"][n][0] == 0 for n in range(trackers.shape[0])
     )
+
+
+def test_sort_ellipse_min_n_valid():
+    mot_tracker = trackingutils.SORTEllipse(1, 1, 0.6, min_n_valid=5)
+    pose = np.array([[-2, 0], [2, 0], [0, 1], [0, -1]], dtype=float)[None, ...]
+    ret = mot_tracker.track(pose)
+    assert ret.size == 0
+    assert len(mot_tracker.trackers) == 0
 
 
 def _ellipse_pose(offset):
