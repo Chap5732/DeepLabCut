@@ -49,10 +49,11 @@ def test_ellipse_fitter():
 
 
 def test_ellipse_tracker(ellipse):
-    tracker1 = trackingutils.EllipseTracker(ellipse.parameters)
-    tracker2 = trackingutils.EllipseTracker(ellipse.parameters)
+    centroid = (ellipse.x, ellipse.y)
+    tracker1 = trackingutils.EllipseTracker(ellipse.parameters, centroid)
+    tracker2 = trackingutils.EllipseTracker(ellipse.parameters, centroid)
     assert tracker1.id != tracker2.id
-    tracker1.update(ellipse.parameters)
+    tracker1.update(ellipse.parameters, centroid)
     assert tracker1.hit_streak == 1
     state = tracker1.predict()
     np.testing.assert_equal(ellipse.parameters, state)

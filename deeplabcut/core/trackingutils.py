@@ -281,7 +281,7 @@ class EllipseFitter:
 
 
 class EllipseTracker(BaseTracker):
-    def __init__(self, params):
+    def __init__(self, params, centroid):
         super().__init__(dim=5, dim_z=5)
         self.kf.R[2:, 2:] *= 10.0
         # High uncertainty to the unobservable initial velocities
@@ -294,23 +294,29 @@ class EllipseTracker(BaseTracker):
         # decisions in the SORT tracker to ensure that associations are based
         # on the last confirmed observation rather than the predicted one.
         self.last_confirmed_state = np.asarray(params).copy()
+        # Additionally store the centroid of the last confirmed pose for
+        # distance gating in subsequent frames.
+        self.last_confirmed_centroid = np.asarray(centroid).copy()
 
     @BaseTracker.state.setter
     def state(self, params):
         state = np.asarray(params).reshape((-1, 1))
         super(EllipseTracker, type(self)).state.fset(self, state)
 
-    def update(self, params):
+    def update(self, params, centroid):
         """Update the tracker with a new observation.
 
         The ``last_confirmed_state`` attribute is refreshed only when a
         detection is successfully associated with the tracker. The prediction
         step deliberately leaves this attribute untouched so that gating is
-        performed using the last confirmed position.
+        performed using the last confirmed position. The centroid of the
+        observation is also stored for future distance gating.
         """
         super().update(np.asarray(params))
-        # After a successful update, synchronise the last confirmed state.
+        # After a successful update, synchronise the last confirmed state and
+        # centroid.
         self.last_confirmed_state = self.state.copy()
+        self.last_confirmed_centroid = np.asarray(centroid).copy()
 
 
 class SkeletonTracker(BaseTracker):
@@ -486,11 +492,12 @@ class SORTEllipse(SORTBase):
         trackers = trackers[valid_idx]
         unmatched_trackers = np.flatnonzero(empty).tolist()
 
-        ellipses, pred_ids = [], []
+        ellipses, centroids, pred_ids = [], [], []
         for i, pose in enumerate(poses):
             el = self.fitter.fit(pose)
             if el is not None:
                 ellipses.append(el)
+                centroids.append(np.nanmean(pose[:, :2], axis=0))
                 if identities is not None:
                     pred_ids.append(mode(identities[i])[0][0])
 
@@ -504,15 +511,19 @@ class SORTEllipse(SORTBase):
                 Ellipse(*self.trackers[idx].last_confirmed_state) for idx in valid_idx
             ]
             cost_matrix = np.zeros((len(ellipses), len(ellipses_trackers)))
-            for i, el in enumerate(ellipses):
+            for i, (el, centroid) in enumerate(zip(ellipses, centroids)):
                 for j, (el_track, el_last) in enumerate(
                     zip(ellipses_trackers, last_confirmed)
                 ):
                     tracker = self.trackers[valid_idx[j]]
                     if self.gate_last_position:
-                        dist = math.hypot(el.x - el_last.x, el.y - el_last.y)
+                        dist = np.linalg.norm(
+                            centroid - tracker.last_confirmed_centroid
+                        )
                     else:
-                        dist = math.hypot(el.x - el_track.x, el.y - el_track.y)
+                        dist = math.hypot(
+                            centroid[0] - el_track.x, centroid[1] - el_track.y
+                        )
                     dt = min(max(tracker.time_since_update, 1), self.max_dt_for_gating)
                     if self.max_px_gate is not None and dist > self.max_px_gate * dt:
                         # Use a large negative number so the Hungarian algorithm never selects this pair
@@ -599,12 +610,12 @@ class SORTEllipse(SORTBase):
                     dt,
                 )
                 animalindex.append(ind)
-                tracker.update(ellipses[ind].parameters)
+                tracker.update(ellipses[ind].parameters, centroids[ind])
             else:
                 animalindex.append(-1)
 
         for i in unmatched_detections:
-            trk = EllipseTracker(ellipses[i].parameters)
+            trk = EllipseTracker(ellipses[i].parameters, centroids[i])
             # Initialize tracker; update occurs on next frame prediction
             if identities is not None:
                 trk.id_ = mode(identities[i])[0][0]
