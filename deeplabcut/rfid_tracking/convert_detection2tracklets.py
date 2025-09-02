@@ -108,7 +108,7 @@ def main(
         f"velocity_gate_cms={velocity_gate_cms}, px_per_cm={px_per_cm}, fps={fps}"
     )
 
-    dlc.convert_detections2tracklets(
+    reports = dlc.convert_detections2tracklets(
         config=config_path,
         videos=videos,
         videotype=videotype,
@@ -117,8 +117,9 @@ def main(
         destfolder=destfolder,
         inferencecfg=base_inferencecfg,
     )
-
     print("\n[OK] 完成。请在对应输出目录查看 *.pickle（tracklets）文件。")
+    for path in reports or []:
+        print(f"[INFO] tracklet report: {path}")
 
 
 if __name__ == "__main__":

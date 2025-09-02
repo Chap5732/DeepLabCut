@@ -1520,7 +1520,8 @@ def _convert_detections_to_tracklets(
             )  # TODO: get cropping parameters and utilize!
         else:
             xy = animals[..., :2]
-        trackers = mot_tracker.track(xy)
+        track_out = mot_tracker.track(xy)
+        trackers = track_out[0] if isinstance(track_out, tuple) else track_out
         trackingutils.fill_tracklets(tracklets, trackers, animals, imname)
 
     bodypartlabels = [joint for joint in joints for _ in range(3)]
@@ -1852,7 +1853,8 @@ def convert_detections2tracklets(
                                 )  # TODO: get cropping parameters and utilize!
                             else:
                                 xy = animals[:, keep_inds, :2]
-                            trackers = mot_tracker.track(xy)
+                            track_out = mot_tracker.track(xy)
+                            trackers = track_out[0] if isinstance(track_out, tuple) else track_out
                         else:
                             # Optimal identity assignment based on soft voting
                             mat = np.zeros(
