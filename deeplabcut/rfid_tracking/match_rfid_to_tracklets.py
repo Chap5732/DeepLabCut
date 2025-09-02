@@ -519,7 +519,7 @@ def main(
     ] = defaultdict(list)
     valid_frame_count: dict[object, int] = defaultdict(int)
     for tk, node in dd.items():
-        if tk in ("header", "single"):
+        if tk in ("header", "single") or not isinstance(node, dict):
             continue
         for fkey, arr in node.items():
             try:
