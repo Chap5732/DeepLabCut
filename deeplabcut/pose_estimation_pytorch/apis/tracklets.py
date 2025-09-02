@@ -8,6 +8,7 @@
 #
 # Licensed under GNU Lesser General Public License v3.0
 #
+import json
 import logging
 import os
 import pickle
@@ -119,6 +120,7 @@ def convert_detections2tracklets(
         print(f"No videos were found in {videos}")
         return
 
+    report_paths = []
     for video in videos:
         print("Processing... ", video)
         if destfolder is None:
@@ -158,6 +160,7 @@ def convert_detections2tracklets(
                 )
             assemblies_data = auxiliaryfunctions.read_pickle(assemblies_path)
 
+            report_path = output_path / f"{video_name}_tracklet_report.json"
             tracklets = build_tracklets(
                 assemblies_data=assemblies_data,
                 track_method=track_method,
@@ -168,10 +171,12 @@ def convert_detections2tracklets(
                 ignore_bodyparts=ignore_bodyparts,
                 unique_bodyparts=cfg["uniquebodyparts"],
                 identity_only=identity_only,
+                report_path=report_path,
             )
 
             with open(track_filename, "wb") as f:
                 pickle.dump(tracklets, f, pickle.HIGHEST_PROTOCOL)
+            report_paths.append(report_path)
 
     os.chdir(str(start_path))
     print(
@@ -179,6 +184,7 @@ def convert_detections2tracklets(
         "deeplabcut.convert_detections2tracklets was run). Now you can "
         "'refine_tracklets' in the GUI, or run 'deeplabcut.stitch_tracklets'."
     )
+    return report_paths
 
 
 def build_tracklets(
@@ -191,6 +197,7 @@ def build_tracklets(
     ignore_bodyparts: list[str] | None = None,
     unique_bodyparts: list | None = None,
     identity_only: bool = False,
+    report_path: str | Path | None = None,
 ) -> dict:
 
     if track_method == "box":
@@ -317,7 +324,11 @@ def build_tracklets(
                 pre_tsu = {
                     trk.id: trk.time_since_update for trk in mot_tracker.trackers
                 }
-                trackers = mot_tracker.track(xy)
+                track_out = mot_tracker.track(xy)
+                if isinstance(track_out, tuple):
+                    trackers = track_out[0]
+                else:
+                    trackers = track_out
                 time_since_updates = {
                     trk.id: pre_tsu.get(trk.id, 0) for trk in mot_tracker.trackers
                 }
@@ -327,6 +338,28 @@ def build_tracklets(
             trackingutils.fill_tracklets(
                 tracklets, trackers, animals, imname, time_since_updates
             )
+
+    if report_path is not None:
+        report = []
+        for tid, events in getattr(mot_tracker, "break_log", {}).items():
+            frames = []
+            if tid in tracklets:
+                frames = [
+                    int(str(k).replace("frame", "")) for k in tracklets[tid].keys()
+                    if str(k).startswith("frame")
+                ]
+            start_frame = min(frames) if frames else None
+            for ev in events:
+                report.append(
+                    {
+                        "tracklet_id": tid,
+                        "start_frame": start_frame,
+                        "end_frame": ev["frame"],
+                        "break_reason": ev["reason"],
+                    }
+                )
+        with open(report_path, "w") as f:
+            json.dump(report, f)
 
     return tracklets
 

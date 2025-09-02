@@ -384,6 +384,62 @@ def _allowed_disp(max_px_gate, v_gate_pxpf, dt):
     return min(limits)
 
 
+class SORTBox(SORTBase):
+    def __init__(self, max_age, min_hits, iou_threshold):
+        self.max_age = max_age
+        self.min_hits = min_hits
+        self.iou_threshold = iou_threshold
+        BoxTracker.n_trackers = 0
+        super().__init__()
+
+    def track(self, bboxes):
+        self.n_frames += 1
+        trks = np.zeros((len(self.trackers), 5))
+        for i, trk in enumerate(self.trackers):
+            trks[i, :4] = trk.predict()
+        if len(bboxes) == 0:
+            matched = np.empty((0, 2), dtype=int)
+            unmatched_dets = []
+            unmatched_trks = list(range(len(trks)))
+        else:
+            iou_matrix = np.zeros((len(bboxes), len(trks)))
+            for d, det in enumerate(bboxes):
+                for t, trk in enumerate(trks):
+                    iou_matrix[d, t] = calc_iou(det, trk[:4])
+            row_ind, col_ind = linear_sum_assignment(-iou_matrix)
+            unmatched_dets = [d for d in range(len(bboxes)) if d not in row_ind]
+            unmatched_trks = [t for t in range(len(trks)) if t not in col_ind]
+            matches = []
+            for r, c in zip(row_ind, col_ind):
+                if iou_matrix[r, c] < self.iou_threshold:
+                    unmatched_dets.append(r)
+                    unmatched_trks.append(c)
+                else:
+                    matches.append([r, c])
+            matched = np.asarray(matches, dtype=int) if matches else np.empty((0, 2), dtype=int)
+
+        for m in matched:
+            self.trackers[m[1]].update(bboxes[m[0]])
+        for i in unmatched_dets:
+            self.trackers.append(BoxTracker(bboxes[i]))
+
+        ret = []
+        i = len(self.trackers)
+        for trk in reversed(self.trackers):
+            d = trk.state
+            if (trk.time_since_update < 1) and (
+                trk.hit_streak >= self.min_hits or self.n_frames <= self.min_hits
+            ):
+                ret.append(np.concatenate((d, [trk.id])).reshape(1, -1))
+            i -= 1
+            if trk.time_since_update > self.max_age:
+                self.trackers.pop(i)
+
+        if len(ret) > 0:
+            return np.concatenate(ret)
+        return np.empty((0, 5))
+
+
 class SORTEllipse(SORTBase):
     def __init__(
         self,
@@ -410,6 +466,7 @@ class SORTEllipse(SORTBase):
         self.min_n_valid = min_n_valid
         EllipseTracker.n_trackers = 0
         super().__init__()
+        self.break_log = defaultdict(list)
         logger.info(
             "SORTEllipse init: max_px_gate=%s v_gate_pxpf=%s gate_last=%s max_dt=%s max_age=%s min_hits=%s sim_thr=%s min_n_valid=%s",
             self.max_px_gate,
@@ -424,6 +481,7 @@ class SORTEllipse(SORTBase):
 
     def track(self, poses, identities=None):
         self.n_frames += 1
+        frame_breaks = []
 
         # 1) 预测所有 tracker
         trackers = np.zeros((len(self.trackers), 6))
@@ -433,10 +491,11 @@ class SORTEllipse(SORTBase):
         valid_idx = np.flatnonzero(~empty)
         trackers = trackers[valid_idx]
         unmatched_trackers = np.flatnonzero(empty).tolist()
-
-        # 2) 拟合检测（椭圆 + 质心）
         ellipses, centroids, pred_ids, det_indices = [], [], [], []
         unmatched_detections = []
+        gated_trackers = set()
+
+        # 2) 拟合检测（椭圆 + 质心）
         for i, pose in enumerate(poses):
             el = self.fitter.fit(pose)
             if el is None:
@@ -489,6 +548,7 @@ class SORTEllipse(SORTBase):
 
                     if allowed is not None and dist > allowed:
                         cost_matrix[i, j] = -1e6  # 硬屏蔽
+                        gated_trackers.add(tracker.id)
                         logger.debug(
                             "[GATE BLOCK][matrix] trk=%s dt=%d dist=%.1f allowed=%.1f frame=%s",
                             tracker.id, dt, dist, allowed, self.n_frames
@@ -551,6 +611,7 @@ class SORTEllipse(SORTBase):
                     if allowed is not None and disp > allowed:
                         unmatched_detection_idx.append(det_ind)
                         unmatched_trackers.append(trk_ind)
+                        gated_trackers.add(tracker.id)
                         logger.debug(
                             "[GATE BLOCK][post] trk=%s dt=%d dist=%.1f allowed=%.1f frame=%s",
                             tracker.id, dt, disp, allowed, self.n_frames
@@ -569,6 +630,19 @@ class SORTEllipse(SORTBase):
             unmatched_detection_idx = np.unique(unmatched_detection_idx)
             unmatched_detections.extend(det_indices[j] for j in unmatched_detection_idx)
             unmatched_detections = np.unique(unmatched_detections)
+
+        if not len(ellipses):
+            for trk in self.trackers:
+                event = {"frame": self.n_frames, "reason": "all_nan"}
+                self.break_log[trk.id].append(event)
+                frame_breaks.append((trk.id, event))
+        else:
+            for idx in unmatched_trackers:
+                trk = self.trackers[idx]
+                if trk.id in gated_trackers:
+                    event = {"frame": self.n_frames, "reason": "gated"}
+                    self.break_log[trk.id].append(event)
+                    frame_breaks.append((trk.id, event))
 
         if self.verbose:
             logger.info(
@@ -620,11 +694,15 @@ class SORTEllipse(SORTBase):
                 )
             i -= 1
             if trk.time_since_update > self.max_age:
+                event = {"frame": self.n_frames, "reason": "max_age"}
+                self.break_log[trk.id].append(event)
+                frame_breaks.append((trk.id, event))
                 self.trackers.pop(i)
-
         if len(ret) > 0:
-            return np.concatenate(ret)
-        return np.empty((0, 7))
+            out = np.concatenate(ret)
+        else:
+            out = np.empty((0, 7))
+        return out, frame_breaks
 
 
 class SORTSkeleton(SORTBase):
