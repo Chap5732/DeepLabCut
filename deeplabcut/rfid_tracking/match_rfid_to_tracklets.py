@@ -706,7 +706,7 @@ def main(
     assignments = {}
 
     for tk, node in list(dd_out.items()):
-        if tk in ("header", "single"):
+        if tk in ("header", "single") or not isinstance(node, dict):
             continue
 
         # 写回计数与逐帧
