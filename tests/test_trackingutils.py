@@ -100,6 +100,20 @@ def _ellipse_pose(offset):
     return base + np.asarray(offset)
 
 
+def test_sort_ellipse_logs_iou_fail():
+    mot_tracker = trackingutils.SORTEllipse(5, 1, 0.1)
+    pose = _ellipse_pose((0, 0))[None, ...]
+    mot_tracker.track(pose)
+    far_pose = _ellipse_pose((10, 10))[None, ...]
+    _, frame_breaks = mot_tracker.track(far_pose)
+    tid = mot_tracker.trackers[0].id
+    assert mot_tracker.break_log[tid][-1]["reason"] == "iou_fail"
+    assert any(
+        tid == trk_id and event["reason"] == "iou_fail"
+        for trk_id, event in frame_breaks
+    )
+
+
 @pytest.mark.parametrize("gate_kwargs", [{"max_px_gate": 5}, {"v_gate_pxpf": 5}])
 def test_sort_ellipse_gates_zero_iou(gate_kwargs):
     mot_tracker = trackingutils.SORTEllipse(5, 1, 0, **gate_kwargs)

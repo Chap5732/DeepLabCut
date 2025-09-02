@@ -416,7 +416,11 @@ class SORTBox(SORTBase):
                     unmatched_trks.append(c)
                 else:
                     matches.append([r, c])
-            matched = np.asarray(matches, dtype=int) if matches else np.empty((0, 2), dtype=int)
+            matched = (
+                np.asarray(matches, dtype=int)
+                if matches
+                else np.empty((0, 2), dtype=int)
+            )
 
         for m in matched:
             self.trackers[m[1]].update(bboxes[m[0]])
@@ -541,7 +545,9 @@ class SORTEllipse(SORTBase):
                             np.linalg.norm(centroid - tracker.last_confirmed_centroid)
                         )
                     else:
-                        dist = math.hypot(centroid[0] - el_track.x, centroid[1] - el_track.y)
+                        dist = math.hypot(
+                            centroid[0] - el_track.x, centroid[1] - el_track.y
+                        )
 
                     dt = min(max(tracker.time_since_update, 1), self.max_dt_for_gating)
                     allowed = _allowed_disp(self.max_px_gate, self.v_gate_pxpf, dt)
@@ -551,14 +557,23 @@ class SORTEllipse(SORTBase):
                         gated_trackers.add(tracker.id)
                         logger.debug(
                             "[GATE BLOCK][matrix] trk=%s dt=%d dist=%.1f allowed=%.1f frame=%s",
-                            tracker.id, dt, dist, allowed, self.n_frames
+                            tracker.id,
+                            dt,
+                            dist,
+                            allowed,
+                            self.n_frames,
                         )
                         continue
 
                     cost = el.calc_similarity_with(el_track)
                     if identities is not None and j < len(self.trackers):
                         id_match = (
-                            2.0 if (hasattr(tracker, "id_") and pred_ids and pred_ids[i] == tracker.id_)
+                            2.0
+                            if (
+                                hasattr(tracker, "id_")
+                                and pred_ids
+                                and pred_ids[i] == tracker.id_
+                            )
                             else 1.0
                         )
                         cost *= id_match
@@ -568,21 +583,32 @@ class SORTEllipse(SORTBase):
             feasible_rows = (cost_matrix > -1e5).any(axis=1) if cost_matrix.size else []
             feasible_cols = (cost_matrix > -1e5).any(axis=0) if cost_matrix.size else []
             if self.verbose:
-                bad_rows = np.where(~feasible_rows)[0].tolist() if len(feasible_rows) else []
-                bad_cols = np.where(~feasible_cols)[0].tolist() if len(feasible_cols) else []
+                bad_rows = (
+                    np.where(~feasible_rows)[0].tolist() if len(feasible_rows) else []
+                )
+                bad_cols = (
+                    np.where(~feasible_cols)[0].tolist() if len(feasible_cols) else []
+                )
                 if bad_rows or bad_cols:
                     logger.debug(
                         "No feasible rows (det idx): %s ; no feasible cols (trk local idx): %s",
-                        bad_rows, bad_cols
+                        bad_rows,
+                        bad_cols,
                     )
 
             # 4) 匈牙利匹配
             if len(ellipses) and len(ellipses_trackers):
-                row_indices, col_indices = linear_sum_assignment(cost_matrix, maximize=True)
+                row_indices, col_indices = linear_sum_assignment(
+                    cost_matrix, maximize=True
+                )
             else:
-                row_indices, col_indices = np.array([], dtype=int), np.array([], dtype=int)
+                row_indices, col_indices = np.array([], dtype=int), np.array(
+                    [], dtype=int
+                )
 
-            unmatched_detection_idx = [i for i in range(len(ellipses)) if i not in row_indices]
+            unmatched_detection_idx = [
+                i for i in range(len(ellipses)) if i not in row_indices
+            ]
             unmatched_trackers.extend(
                 valid_idx[j] for j in range(len(trackers)) if j not in col_indices
             )
@@ -596,7 +622,11 @@ class SORTEllipse(SORTBase):
                 else:
                     matches_list.append([row, valid_idx[col]])
 
-            matches = np.asarray(matches_list, dtype=int) if matches_list else np.empty((0, 2), dtype=int)
+            matches = (
+                np.asarray(matches_list, dtype=int)
+                if matches_list
+                else np.empty((0, 2), dtype=int)
+            )
 
             # 5) 匹配后复检（再次硬门控，保持同一规则）
             if self.gate_last_position and len(matches):
@@ -614,16 +644,26 @@ class SORTEllipse(SORTBase):
                         gated_trackers.add(tracker.id)
                         logger.debug(
                             "[GATE BLOCK][post] trk=%s dt=%d dist=%.1f allowed=%.1f frame=%s",
-                            tracker.id, dt, disp, allowed, self.n_frames
+                            tracker.id,
+                            dt,
+                            disp,
+                            allowed,
+                            self.n_frames,
                         )
                     else:
                         keep.append([det_ind, trk_ind])
                         logger.debug(
                             "[GATE PASS ][post] trk=%s dt=%d dist=%.1f allowed=%.1f frame=%s",
-                            tracker.id, dt, disp, allowed if allowed is not None else float("inf"), self.n_frames
+                            tracker.id,
+                            dt,
+                            disp,
+                            allowed if allowed is not None else float("inf"),
+                            self.n_frames,
                         )
                 matches = (
-                    np.asarray(keep, dtype=int) if len(keep) else np.empty((0, 2), dtype=int)
+                    np.asarray(keep, dtype=int)
+                    if len(keep)
+                    else np.empty((0, 2), dtype=int)
                 )
 
             unmatched_trackers = np.unique(unmatched_trackers)
@@ -643,13 +683,21 @@ class SORTEllipse(SORTBase):
                     event = {"frame": self.n_frames, "reason": "gated"}
                     self.break_log[trk.id].append(event)
                     frame_breaks.append((trk.id, event))
+                else:
+                    event = {"frame": self.n_frames, "reason": "iou_fail"}
+                    self.break_log[trk.id].append(event)
+                    frame_breaks.append((trk.id, event))
 
         if self.verbose:
             logger.info(
                 "[frame %s] um_det=%s  um_trk=%s",
                 self.n_frames,
-                unmatched_detections.tolist() if len(np.atleast_1d(unmatched_detections)) else [],
-                unmatched_trackers.tolist() if len(np.atleast_1d(unmatched_trackers)) else [],
+                unmatched_detections.tolist()
+                if len(np.atleast_1d(unmatched_detections))
+                else [],
+                unmatched_trackers.tolist()
+                if len(np.atleast_1d(unmatched_trackers))
+                else [],
             )
 
         # 6) 更新已匹配 tracker
@@ -671,7 +719,9 @@ class SORTEllipse(SORTBase):
                 animalindex.append(-1)
 
         # 7) 为未匹配检测创建新 tracker
-        for i in unmatched_detection_idx if 'unmatched_detection_idx' in locals() else []:
+        for i in (
+            unmatched_detection_idx if "unmatched_detection_idx" in locals() else []
+        ):
             trk = EllipseTracker(ellipses[i].parameters, centroids[i])
             if identities is not None and det_indices[i] < len(identities):
                 try:
@@ -690,7 +740,9 @@ class SORTEllipse(SORTBase):
                 trk.hit_streak >= self.min_hits or self.n_frames <= self.min_hits
             ):
                 ret.append(
-                    np.concatenate((d, [trk.id, int(animalindex[i - 1])])).reshape(1, -1)
+                    np.concatenate((d, [trk.id, int(animalindex[i - 1])])).reshape(
+                        1, -1
+                    )
                 )
             i -= 1
             if trk.time_since_update > self.max_age:
@@ -773,7 +825,9 @@ class SORTSkeleton(SORTBase):
         row_indices, col_indices = linear_sum_assignment(mat, maximize=False)
 
         unmatched_poses = [p for p, _ in enumerate(poses) if p not in row_indices]
-        unmatched_trackers = [t for t, _ in enumerate(poses_ref) if t not in col_indices]
+        unmatched_trackers = [
+            t for t, _ in enumerate(poses_ref) if t not in col_indices
+        ]
         matches = np.c_[row_indices, col_indices]
 
         animalindex = []
@@ -848,7 +902,9 @@ def reconstruct_all_ellipses(data, sd):
     ellipses = np.full((len(animals), nrows, 5), np.nan)
     fitter = EllipseFitter(sd)
     for n, animal in enumerate(animals):
-        _data = xy.xs(animal, axis=1, level="individuals").values.reshape((nrows, -1, 2))
+        _data = xy.xs(animal, axis=1, level="individuals").values.reshape(
+            (nrows, -1, 2)
+        )
         for i, coords in enumerate(tqdm(_data)):
             el = fitter.fit(coords.astype(np.float64))
             if el is not None:
@@ -865,4 +921,3 @@ def compute_v_gate_pxpf(v_gate_cms=None, px_per_cm=None, fps=None):
     except Exception:
         pass
     return None
-
