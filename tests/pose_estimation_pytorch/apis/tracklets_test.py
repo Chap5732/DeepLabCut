@@ -3,7 +3,10 @@ import pandas as pd
 import pytest
 
 from deeplabcut.core import trackingutils
-from deeplabcut.pose_estimation_pytorch.apis.tracklets import build_tracklets
+from deeplabcut.pose_estimation_pytorch.apis.tracklets import (
+    build_tracklets,
+    rle_break_log,
+)
 
 
 @pytest.mark.parametrize(
@@ -105,7 +108,13 @@ def test_build_tracklets_report_csv(tmp_path, monkeypatch):
     class DummySORTBox(trackingutils.SORTBox):
         def __init__(self, *args, **kwargs):
             super().__init__(*args, **kwargs)
-            self.break_log = {0: [{"frame": 0, "reason": "dummy", "assembly": -1}]}
+            self.break_log = {
+                0: [
+                    {"frame": 0, "reason": "dummy", "assembly": -1},
+                    {"frame": 1, "reason": "dummy", "assembly": -1},
+                    {"frame": 2, "reason": "other", "assembly": 0},
+                ]
+            }
 
     monkeypatch.setattr(trackingutils, "SORTBox", DummySORTBox)
 
@@ -117,7 +126,7 @@ def test_build_tracklets_report_csv(tmp_path, monkeypatch):
         inference_cfg={"max_age": 3, "min_hits": 1, "topktoretain": 1, "pcutoff": 0.5},
         joints=["nose", "ear"],
         scorer="DLC",
-        num_frames=1,
+        num_frames=3,
         report_path=report_path,
     )
 
@@ -129,7 +138,35 @@ def test_build_tracklets_report_csv(tmp_path, monkeypatch):
         "break_reason",
         "assembly",
     ]
-    assert len(df) == 1
-    assert df.loc[0, "tracklet_id"] == 0
-    assert df.loc[0, "break_reason"] == "dummy"
-    assert df.loc[0, "assembly"] == -1
+    assert len(df) == 2
+    assert df.loc[0].to_dict() == {
+        "tracklet_id": 0,
+        "start_frame": 0,
+        "end_frame": 1,
+        "break_reason": "dummy",
+        "assembly": -1,
+    }
+    assert df.loc[1].to_dict() == {
+        "tracklet_id": 0,
+        "start_frame": 2,
+        "end_frame": 2,
+        "break_reason": "other",
+        "assembly": 0,
+    }
+
+
+def test_rle_break_log():
+    events = [
+        {"frame": 0, "reason": "a", "assembly": -1},
+        {"frame": 1, "reason": "a", "assembly": -1},
+        {"frame": 3, "reason": "b", "assembly": 2},
+        {"frame": 4, "reason": "b", "assembly": 2},
+        {"frame": 5, "reason": "a", "assembly": 3},
+    ]
+
+    encoded = rle_break_log(events)
+    assert encoded == [
+        {"start_frame": 0, "end_frame": 1, "break_reason": "a", "assembly": -1},
+        {"start_frame": 3, "end_frame": 4, "break_reason": "b", "assembly": 2},
+        {"start_frame": 5, "end_frame": 5, "break_reason": "a", "assembly": 3},
+    ]

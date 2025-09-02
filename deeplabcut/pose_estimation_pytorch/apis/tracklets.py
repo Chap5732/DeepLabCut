@@ -341,26 +341,9 @@ def build_tracklets(
     if report_path is not None:
         report = []
         for tid, events in getattr(mot_tracker, "break_log", {}).items():
-            frames = []
-            if tid in tracklets:
-                frames = [
-                    int(str(k).replace("frame", ""))
-                    for k in tracklets[tid].keys()
-                    if str(k).startswith("frame")
-                ]
-            start_frame = min(frames) if frames else None
-            for ev in events:
-                report.append(
-                    {
-                        "tracklet_id": tid,
-                        "start_frame": start_frame,
-                        "end_frame": ev["frame"],
-                        "break_reason": ev["reason"],
-                        "assembly": ev.get("assembly", -1),
-                    }
-                )
-        if report_path is not None:
-            pd.DataFrame(report).to_csv(report_path, index=False)
+            for segment in rle_break_log(events):
+                report.append({"tracklet_id": tid, **segment})
+        pd.DataFrame(report).to_csv(report_path, index=False)
 
     return tracklets
 
@@ -373,6 +356,54 @@ def _create_tracklets_header(joints, dlc_scorer):
         np.vstack([scorers, bodypart_labels, xyl_value]),
         names=["scorer", "bodyparts", "coords"],
     )
+
+
+def rle_break_log(events: list[dict]) -> list[dict]:
+    """Run-length encode break events.
+
+    Groups contiguous events with the same ``break_reason`` and returns a list of
+    segments containing the start and end frame for each reason. The ``assembly``
+    value from the first event in each segment is preserved.
+    """
+    if not events:
+        return []
+
+    events = sorted(events, key=lambda e: e["frame"])
+    segments: list[dict] = []
+
+    start = events[0]["frame"]
+    last = start
+    reason = events[0]["reason"]
+    assembly = events[0].get("assembly", -1)
+
+    for ev in events[1:]:
+        if ev["reason"] == reason:
+            last = ev["frame"]
+            continue
+
+        segments.append(
+            {
+                "start_frame": start,
+                "end_frame": last,
+                "break_reason": reason,
+                "assembly": assembly,
+            }
+        )
+
+        start = last = ev["frame"]
+        reason = ev["reason"]
+        assembly = ev.get("assembly", -1)
+
+    segments.append(
+        {
+            "start_frame": start,
+            "end_frame": last,
+            "break_reason": reason,
+            "assembly": assembly,
+        }
+    )
+
+    return segments
 
 
 def _conv_predictions_to_assemblies(
