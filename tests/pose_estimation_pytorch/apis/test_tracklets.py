@@ -105,7 +105,7 @@ def test_build_tracklets_report_csv(tmp_path, monkeypatch):
     class DummySORTBox(trackingutils.SORTBox):
         def __init__(self, *args, **kwargs):
             super().__init__(*args, **kwargs)
-            self.break_log = {0: [{"frame": 0, "reason": "dummy"}]}
+            self.break_log = {0: [{"frame": 0, "reason": "dummy", "assembly": -1}]}
 
     monkeypatch.setattr(trackingutils, "SORTBox", DummySORTBox)
 
@@ -127,7 +127,9 @@ def test_build_tracklets_report_csv(tmp_path, monkeypatch):
         "start_frame",
         "end_frame",
         "break_reason",
+        "assembly",
     ]
     assert len(df) == 1
     assert df.loc[0, "tracklet_id"] == 0
     assert df.loc[0, "break_reason"] == "dummy"
+    assert df.loc[0, "assembly"] == -1

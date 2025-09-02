@@ -673,18 +673,22 @@ class SORTEllipse(SORTBase):
 
         if not len(ellipses):
             for trk in self.trackers:
-                event = {"frame": self.n_frames, "reason": "all_nan"}
+                event = {"frame": self.n_frames, "reason": "all_nan", "assembly": -1}
                 self.break_log[trk.id].append(event)
                 frame_breaks.append((trk.id, event))
         else:
             for idx in unmatched_trackers:
                 trk = self.trackers[idx]
                 if trk.id in gated_trackers:
-                    event = {"frame": self.n_frames, "reason": "gated"}
+                    event = {"frame": self.n_frames, "reason": "gated", "assembly": -1}
                     self.break_log[trk.id].append(event)
                     frame_breaks.append((trk.id, event))
                 else:
-                    event = {"frame": self.n_frames, "reason": "iou_fail"}
+                    event = {
+                        "frame": self.n_frames,
+                        "reason": "iou_fail",
+                        "assembly": -1,
+                    }
                     self.break_log[trk.id].append(event)
                     frame_breaks.append((trk.id, event))
 
@@ -746,7 +750,12 @@ class SORTEllipse(SORTBase):
                 )
             i -= 1
             if trk.time_since_update > self.max_age:
-                event = {"frame": self.n_frames, "reason": "max_age"}
+                det_idx = int(animalindex[i]) if i < len(animalindex) else -1
+                event = {
+                    "frame": self.n_frames,
+                    "reason": "max_age",
+                    "assembly": det_idx,
+                }
                 self.break_log[trk.id].append(event)
                 frame_breaks.append((trk.id, event))
                 self.trackers.pop(i)

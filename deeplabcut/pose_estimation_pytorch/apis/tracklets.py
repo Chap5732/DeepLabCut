@@ -344,7 +344,8 @@ def build_tracklets(
             frames = []
             if tid in tracklets:
                 frames = [
-                    int(str(k).replace("frame", "")) for k in tracklets[tid].keys()
+                    int(str(k).replace("frame", ""))
+                    for k in tracklets[tid].keys()
                     if str(k).startswith("frame")
                 ]
             start_frame = min(frames) if frames else None
@@ -355,6 +356,7 @@ def build_tracklets(
                         "start_frame": start_frame,
                         "end_frame": ev["frame"],
                         "break_reason": ev["reason"],
+                        "assembly": ev.get("assembly", -1),
                     }
                 )
         if report_path is not None:
