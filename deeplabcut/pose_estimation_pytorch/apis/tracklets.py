@@ -8,7 +8,6 @@
 #
 # Licensed under GNU Lesser General Public License v3.0
 #
-import json
 import logging
 import os
 import pickle
@@ -160,7 +159,7 @@ def convert_detections2tracklets(
                 )
             assemblies_data = auxiliaryfunctions.read_pickle(assemblies_path)
 
-            report_path = output_path / f"{video_name}_tracklet_report.json"
+            report_path = output_path / f"{video_name}_tracklet_report.csv"
             tracklets = build_tracklets(
                 assemblies_data=assemblies_data,
                 track_method=track_method,
@@ -358,8 +357,8 @@ def build_tracklets(
                         "break_reason": ev["reason"],
                     }
                 )
-        with open(report_path, "w") as f:
-            json.dump(report, f)
+        if report_path is not None:
+            pd.DataFrame(report).to_csv(report_path, index=False)
 
     return tracklets
 
