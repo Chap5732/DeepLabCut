@@ -5,6 +5,7 @@ from pathlib import Path
 from typing import Optional
 
 from . import config as cfg
+from .export_chains import export_chain_tracks
 from .make_video import main as make_video
 from .match_rfid_to_tracklets import main as match_rfid_to_tracklets
 from .reconstruct_from_pickle import main as reconstruct_from_pickle
@@ -25,6 +26,7 @@ def run_pipeline(
     trainingsetindex: int = 0,
     output_video: Optional[str] = None,
     config_override: str | Path | None = None,
+    export_chain_table: bool = True,
 ) -> str:
     """Run the full video + RFID analysis pipeline.
 
@@ -62,6 +64,10 @@ def run_pipeline(
     config_override : str | Path, optional
         YAML file to override values in :mod:`rfid_tracking.config` before
         running the pipeline.
+    export_chain_table : bool, optional
+        When ``True`` (default) the reconstructed RFID chains are exported as a
+        DLC-style ``.h5`` table alongside the tracklet pickle. Advanced users
+        can disable this by passing ``False``.
 
     Notes
     -----
@@ -242,6 +248,17 @@ def run_pipeline(
     if out_subdir:
         track_pickle = track_pickle.parent / out_subdir / track_pickle.name
     logger.info("Finished reconstructing identity chains for %s", track_pickle)
+
+    if export_chain_table:
+        logger.info("Exporting RFID chain tracks for %s", track_pickle)
+        exported = export_chain_tracks(track_pickle)
+        if exported:
+            logger.info("Saved RFID chain tracks to %s", exported)
+        else:
+            logger.info(
+                "No chain-tagged tracklets found in %s; skipping RFID chain export",
+                track_pickle,
+            )
 
     # 5) generate visualization video
     out_vid = (
