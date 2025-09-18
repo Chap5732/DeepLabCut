@@ -209,11 +209,12 @@ def parse_timestamps_csv(ts_path: str) -> tuple[np.ndarray, np.ndarray]:
     df = pd.read_csv(ts_path)
     cols = {c.lower(): c for c in df.columns}
 
-    frame_k = next(
-        (cols.get(k) for k in ["frame", "frame_id", "fid", "index"] if k in cols), None
-    )
+    frame_keys = ["frame", "frame_id", "fid", "index", "frame_number"]
+    frame_k = next((cols.get(k) for k in frame_keys if k in cols), None)
     if frame_k is None:
-        raise ValueError("timestamps.csv 未找到帧列（frame/frame_id/fid/index）")
+        raise ValueError(
+            f"timestamps.csv 未找到帧列（{'/'.join(frame_keys)}）"
+        )
 
     time_keys = [
         "time",

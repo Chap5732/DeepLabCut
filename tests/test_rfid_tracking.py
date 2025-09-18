@@ -43,7 +43,7 @@ def test_resume_after_partial_pickle(tmp_path):
     _write_simple_csv(rfid_csv, "time,tag,id", ["0,A,0", "1,A,0"])
 
     ts_csv = tmp_path / "timestamps.csv"
-    _write_simple_csv(ts_csv, "frame,time", ["0,0", "1,1"])
+    _write_simple_csv(ts_csv, "frame_number,time", ["0,0", "1,1"])
 
     pickle_path = tmp_path / "tracklets.pickle"
     dd = {
